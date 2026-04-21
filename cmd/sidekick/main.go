@@ -114,14 +114,14 @@ func runServer() error {
 	if err != nil {
 		return fmt.Errorf("opening event store: %w", err)
 	}
-	defer eventStore.Close()
+	defer eventStore.Close() //nolint:errcheck // best-effort cleanup on shutdown
 
 	// Open task store (same database, separate table).
 	taskStore, err := task.NewSQLiteStore(cfg.DatabasePath)
 	if err != nil {
 		return fmt.Errorf("opening task store: %w", err)
 	}
-	defer taskStore.Close()
+	defer taskStore.Close() //nolint:errcheck // best-effort cleanup on shutdown
 
 	// Create event bus.
 	eventBus := event.NewBus()

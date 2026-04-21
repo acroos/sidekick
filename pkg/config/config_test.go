@@ -1,7 +1,6 @@
 package config
 
 import (
-	"os"
 	"testing"
 	"time"
 )
@@ -65,7 +64,7 @@ func TestLoad_CustomValues(t *testing.T) {
 }
 
 func TestLoad_MissingSidekickAPIKey(t *testing.T) {
-	os.Unsetenv("SIDEKICK_API_KEY")
+	t.Setenv("SIDEKICK_API_KEY", "")
 	t.Setenv("ANTHROPIC_API_KEY", "sk-ant-test")
 
 	_, err := Load()
@@ -76,7 +75,7 @@ func TestLoad_MissingSidekickAPIKey(t *testing.T) {
 
 func TestLoad_MissingAnthropicAPIKey(t *testing.T) {
 	t.Setenv("SIDEKICK_API_KEY", "sk-test")
-	os.Unsetenv("ANTHROPIC_API_KEY")
+	t.Setenv("ANTHROPIC_API_KEY", "")
 
 	_, err := Load()
 	if err == nil {

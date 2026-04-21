@@ -17,6 +17,16 @@ go test ./internal/sandbox/... -run TestExecStream   # single test/package
 golangci-lint run ./...
 ```
 
+## Pre-push checks
+
+Run all of these before pushing. CI will fail if any of them fail.
+
+```bash
+go build ./...
+go test -race ./...
+golangci-lint run ./...
+```
+
 ## Architecture
 
 The system is a layered orchestration platform:

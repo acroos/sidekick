@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -85,7 +86,7 @@ func (s *SQLiteStore) Get(ctx context.Context, id string) (*Task, error) {
 		 FROM tasks WHERE id = ?`, id)
 
 	t, err := scanTask(row)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -170,20 +171,15 @@ func (s *SQLiteStore) Update(ctx context.Context, t *Task) error {
 	return nil
 }
 
-// scanner is an interface satisfied by both *sql.Row and *sql.Rows.
-type scanner interface {
-	Scan(dest ...any) error
-}
-
 func scanTask(row *sql.Row) (*Task, error) {
 	var (
-		t            Task
-		variables    string
-		steps        string
-		status       string
-		createdAt    string
-		startedAt    sql.NullString
-		completedAt  sql.NullString
+		t           Task
+		variables   string
+		steps       string
+		status      string
+		createdAt   string
+		startedAt   sql.NullString
+		completedAt sql.NullString
 	)
 	err := row.Scan(
 		&t.ID, &t.WorkflowRef, &variables, &status, &steps,
@@ -197,13 +193,13 @@ func scanTask(row *sql.Row) (*Task, error) {
 
 func scanTaskRows(rows *sql.Rows) (*Task, error) {
 	var (
-		t            Task
-		variables    string
-		steps        string
-		status       string
-		createdAt    string
-		startedAt    sql.NullString
-		completedAt  sql.NullString
+		t           Task
+		variables   string
+		steps       string
+		status      string
+		createdAt   string
+		startedAt   sql.NullString
+		completedAt sql.NullString
 	)
 	err := rows.Scan(
 		&t.ID, &t.WorkflowRef, &variables, &status, &steps,

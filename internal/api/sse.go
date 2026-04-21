@@ -102,9 +102,9 @@ func (s *Server) handleStreamEvents(w http.ResponseWriter, r *http.Request) {
 
 // writeSSEEvent writes a single SSE event to the response.
 func writeSSEEvent(w http.ResponseWriter, evt *event.Event) {
-	fmt.Fprintf(w, "event: %s\n", evt.Type)
-	fmt.Fprintf(w, "id: %d\n", evt.ID)
-	fmt.Fprintf(w, "data: %s\n\n", string(evt.Data))
+	_, _ = fmt.Fprintf(w, "event: %s\n", evt.Type)
+	_, _ = fmt.Fprintf(w, "id: %d\n", evt.ID)
+	_, _ = fmt.Fprintf(w, "data: %s\n\n", string(evt.Data))
 }
 
 // parseTypeFilter parses a comma-separated list of event types.

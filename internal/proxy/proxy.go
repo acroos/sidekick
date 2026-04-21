@@ -174,7 +174,7 @@ func (p *Proxy) handleProxy(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "upstream request failed: "+err.Error(), http.StatusBadGateway)
 		return
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // best-effort cleanup
 
 	// Read the response body to extract token usage.
 	respBody, err := io.ReadAll(resp.Body)

@@ -9,9 +9,9 @@ type streamEvent struct {
 	Subtype string         `json:"subtype,omitempty"` // e.g., "init", "success"
 	Message *streamMessage `json:"message,omitempty"` // Present for "assistant" type
 	// Top-level tool fields (alternative to message.content blocks).
-	Tool    string          `json:"tool,omitempty"`
-	Input   json.RawMessage `json:"input,omitempty"`
-	Output  string          `json:"output,omitempty"`
+	Tool   string          `json:"tool,omitempty"`
+	Input  json.RawMessage `json:"input,omitempty"`
+	Output string          `json:"output,omitempty"`
 	// Result fields.
 	Result  string `json:"result,omitempty"`
 	IsError bool   `json:"is_error,omitempty"`

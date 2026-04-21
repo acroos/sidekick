@@ -4,15 +4,15 @@ import "time"
 
 // TaskResponse is the API-facing JSON representation of a Task.
 type TaskResponse struct {
-	ID              string          `json:"id"`
-	Status          string          `json:"status"`
-	WorkflowRef     string          `json:"workflow"`
-	Steps           []StepResponse  `json:"steps,omitempty"`
-	CreatedAt       time.Time       `json:"created_at"`
-	StartedAt       *time.Time      `json:"started_at,omitempty"`
-	CompletedAt     *time.Time      `json:"completed_at,omitempty"`
-	Error           string          `json:"error,omitempty"`
-	TotalTokensUsed int             `json:"total_tokens_used,omitempty"`
+	ID              string         `json:"id"`
+	Status          string         `json:"status"`
+	WorkflowRef     string         `json:"workflow"`
+	Steps           []StepResponse `json:"steps,omitempty"`
+	CreatedAt       time.Time      `json:"created_at"`
+	StartedAt       *time.Time     `json:"started_at,omitempty"`
+	CompletedAt     *time.Time     `json:"completed_at,omitempty"`
+	Error           string         `json:"error,omitempty"`
+	TotalTokensUsed int            `json:"total_tokens_used,omitempty"`
 }
 
 // StepResponse is the API-facing JSON representation of a StepResult.
