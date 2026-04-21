@@ -9,6 +9,8 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/joho/godotenv"
+
 	"github.com/austinroos/sidekick/internal/agent"
 	"github.com/austinroos/sidekick/internal/api"
 	"github.com/austinroos/sidekick/internal/cli"
@@ -18,7 +20,6 @@ import (
 	"github.com/austinroos/sidekick/internal/task"
 	"github.com/austinroos/sidekick/internal/workflow"
 	"github.com/austinroos/sidekick/pkg/config"
-	"github.com/joho/godotenv"
 )
 
 var version = "dev"

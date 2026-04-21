@@ -18,22 +18,24 @@ linters:
     - nilerr
     - errorlint
 
-linters-settings:
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - style
-  goimports:
-    local-prefixes: github.com/austinroos/sidekick
-  misspell:
-    locale: US
+  settings:
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+    misspell:
+      locale: US
 
 formatters:
   enable:
     - gofmt
     - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/austinroos/sidekick
 
 issues:
-  exclude-use-default: false
   max-issues-per-linter: 0
   max-same-issues: 0
+  fix: true
