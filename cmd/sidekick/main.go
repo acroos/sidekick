@@ -9,6 +9,8 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/joho/godotenv"
+
 	"github.com/austinroos/sidekick/internal/agent"
 	"github.com/austinroos/sidekick/internal/api"
 	"github.com/austinroos/sidekick/internal/cli"
@@ -23,6 +25,9 @@ import (
 var version = "dev"
 
 func main() {
+	// Load .env file if present; ignore error when file doesn't exist.
+	_ = godotenv.Load()
+
 	if err := dispatch(); err != nil {
 		fmt.Fprintf(os.Stderr, "sidekick: %v\n", err)
 		os.Exit(1)

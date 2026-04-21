@@ -234,7 +234,7 @@ type envCaptureSandbox struct {
 
 func (s *envCaptureSandbox) ExecStream(_ context.Context, cmd sandbox.Command) (*sandbox.ExecStream, error) {
 	*s.capturedEnv = cmd.Env
-	lines, result := s.mockSandbox.execFunc(cmd.Args)
+	lines, result := s.execFunc(cmd.Args)
 	output := make(chan sandbox.OutputLine, len(lines)+1)
 	done := make(chan sandbox.ExecResult, 1)
 	for _, l := range lines {

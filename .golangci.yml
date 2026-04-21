@@ -1,3 +1,5 @@
+version: "2"
+
 run:
   timeout: 5m
 
@@ -8,10 +10,7 @@ linters:
     - ineffassign
     - staticcheck
     - unused
-    - gosimple
     - gocritic
-    - gofmt
-    - goimports
     - misspell
     - unconvert
     - unparam
@@ -19,19 +18,24 @@ linters:
     - nilerr
     - errorlint
 
-linters-settings:
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - style
-    disabled-checks:
-      - hugeParam
-  goimports:
-    local-prefixes: github.com/austinroos/sidekick
-  misspell:
-    locale: US
+  settings:
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+    misspell:
+      locale: US
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/austinroos/sidekick
 
 issues:
-  exclude-use-default: false
   max-issues-per-linter: 0
   max-same-issues: 0
+  fix: true
