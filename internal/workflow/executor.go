@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"time"
 
+	"github.com/austinroos/sidekick/internal/agent"
 	"github.com/austinroos/sidekick/internal/event"
 	"github.com/austinroos/sidekick/internal/sandbox"
 	"github.com/austinroos/sidekick/internal/task"
@@ -14,9 +16,10 @@ import (
 // Executor orchestrates workflow execution: creates a sandbox, runs steps
 // in topological order, emits events, and applies failure policies.
 type Executor struct {
-	Provider sandbox.Provider
-	Bus      *event.Bus
-	Store    event.Store
+	Provider    sandbox.Provider
+	Bus         *event.Bus
+	Store       event.Store
+	AgentRunner *agent.Runner // nil = agent steps fail gracefully
 }
 
 // Execute runs a workflow for the given task, returning the populated task result.
@@ -40,10 +43,15 @@ func (e *Executor) Execute(ctx context.Context, taskID string, wf *Workflow, var
 	t.StartedAt = &now
 
 	// Create sandbox.
+	allowHosts := wf.Sandbox.AllowHosts
+	if e.AgentRunner != nil && hasAgentSteps(wf) {
+		// Ensure sandboxes can reach the LLM proxy through restricted networks.
+		allowHosts = append(append([]string{}, allowHosts...), e.AgentRunner.ProxyHost())
+	}
 	sbCfg := sandbox.Config{
 		Image:      wf.Sandbox.Image,
 		Network:    sandbox.NetworkPolicy(wf.Sandbox.Network),
-		AllowHosts: wf.Sandbox.AllowHosts,
+		AllowHosts: allowHosts,
 		Timeout:    wf.Timeout.Duration,
 	}
 	sb, err := e.Provider.Create(ctx, sbCfg)
@@ -111,7 +119,7 @@ func (e *Executor) Execute(ctx context.Context, taskID string, wf *Workflow, var
 		}
 
 		// Execute the step (with retry support).
-		sr := e.executeStep(ctx, taskID, sb, step, wf.MaxRetries)
+		sr := e.executeStep(ctx, taskID, sb, step, wf.MaxRetries, variables, results)
 		results[stepName] = sr
 		t.Steps = append(t.Steps, sr)
 		totalTokens += sr.TokensUsed
@@ -154,7 +162,7 @@ func (e *Executor) Execute(ctx context.Context, taskID string, wf *Workflow, var
 }
 
 // executeStep runs a single step, handling retries for FailRetry policy.
-func (e *Executor) executeStep(ctx context.Context, taskID string, sb sandbox.Sandbox, step *Step, maxRetries int) task.StepResult {
+func (e *Executor) executeStep(ctx context.Context, taskID string, sb sandbox.Sandbox, step *Step, maxRetries int, variables map[string]string, results map[string]task.StepResult) task.StepResult {
 	attempts := 1
 	if step.OnFailure == FailRetry && maxRetries > 0 {
 		attempts = maxRetries + 1
@@ -162,7 +170,7 @@ func (e *Executor) executeStep(ctx context.Context, taskID string, sb sandbox.Sa
 
 	var sr task.StepResult
 	for attempt := range attempts {
-		sr = e.runStep(ctx, taskID, sb, step)
+		sr = e.runStep(ctx, taskID, sb, step, variables, results)
 		if sr.Status == task.StatusSucceeded {
 			return sr
 		}
@@ -175,7 +183,7 @@ func (e *Executor) executeStep(ctx context.Context, taskID string, sb sandbox.Sa
 }
 
 // runStep executes a single step and returns its result.
-func (e *Executor) runStep(ctx context.Context, taskID string, sb sandbox.Sandbox, step *Step) task.StepResult {
+func (e *Executor) runStep(ctx context.Context, taskID string, sb sandbox.Sandbox, step *Step, variables map[string]string, results map[string]task.StepResult) task.StepResult {
 	start := time.Now()
 	sr := task.StepResult{
 		Name:      step.Name,
@@ -183,16 +191,7 @@ func (e *Executor) runStep(ctx context.Context, taskID string, sb sandbox.Sandbo
 	}
 
 	if step.Type == StepAgent {
-		sr.Status = task.StatusFailed
-		sr.Stderr = "agent steps not yet supported"
-		sr.Duration = time.Since(start)
-		e.emit(ctx, taskID, "step.started", event.StepStarted{Step: step.Name})
-		e.emit(ctx, taskID, "step.completed", event.StepCompleted{
-			Step:       step.Name,
-			Status:     string(sr.Status),
-			DurationMs: sr.Duration.Milliseconds(),
-		})
-		return sr
+		return e.runAgentStep(ctx, taskID, sb, step, variables, results, sr, start)
 	}
 
 	e.emit(ctx, taskID, "step.started", event.StepStarted{Step: step.Name})
@@ -247,6 +246,97 @@ func (e *Executor) runStep(ctx context.Context, taskID string, sb sandbox.Sandbo
 	})
 
 	return sr
+}
+
+// runAgentStep executes an agent step using the Claude Code agent runtime.
+func (e *Executor) runAgentStep(ctx context.Context, taskID string, sb sandbox.Sandbox, step *Step, variables map[string]string, results map[string]task.StepResult, sr task.StepResult, start time.Time) task.StepResult {
+	if e.AgentRunner == nil {
+		sr.Status = task.StatusFailed
+		sr.Stderr = "agent runner not configured"
+		sr.Duration = time.Since(start)
+		e.emit(ctx, taskID, "step.started", event.StepStarted{Step: step.Name})
+		e.emit(ctx, taskID, "step.completed", event.StepCompleted{
+			Step:       step.Name,
+			Status:     string(sr.Status),
+			DurationMs: sr.Duration.Milliseconds(),
+		})
+		return sr
+	}
+
+	e.emit(ctx, taskID, "step.started", event.StepStarted{Step: step.Name})
+
+	// Build readFile using sandbox CopyOut.
+	readFile := func(path string) (string, error) {
+		rc, err := sb.CopyOut(ctx, "/workspace/"+path)
+		if err != nil {
+			return "", err
+		}
+		defer rc.Close()
+		data, err := io.ReadAll(rc)
+		return string(data), err
+	}
+
+	// Assemble context from file, variable, and step output sources.
+	contextStr, err := AssembleContext(step.Context, variables, results, readFile)
+	if err != nil {
+		sr.Status = task.StatusFailed
+		sr.Stderr = fmt.Sprintf("assembling context: %v", err)
+		sr.Duration = time.Since(start)
+		e.emit(ctx, taskID, "step.completed", event.StepCompleted{
+			Step:       step.Name,
+			Status:     string(sr.Status),
+			DurationMs: sr.Duration.Milliseconds(),
+		})
+		return sr
+	}
+
+	fullPrompt := contextStr + step.Prompt
+
+	// Wrap the executor's emit as the agent's event callback.
+	emitFn := func(eventType string, data any) {
+		e.emit(ctx, taskID, eventType, data)
+	}
+
+	agentResult, err := e.AgentRunner.Run(ctx, sb, agent.RunConfig{
+		TaskID:       taskID,
+		StepName:     step.Name,
+		Prompt:       fullPrompt,
+		AllowedTools: step.AllowedTools,
+		WorkDir:      "/workspace",
+	}, emitFn)
+
+	if err != nil {
+		sr.Status = task.StatusFailed
+		sr.Stderr = fmt.Sprintf("agent error: %v", err)
+	} else if agentResult.ExitCode != 0 {
+		sr.Status = task.StatusFailed
+		sr.ExitCode = agentResult.ExitCode
+	} else {
+		sr.Status = task.StatusSucceeded
+		sr.Stdout = agentResult.Output
+	}
+
+	sr.ExitCode = agentResult.ExitCode
+	sr.TokensUsed = agentResult.TokensUsed
+	sr.Duration = time.Since(start)
+
+	e.emit(ctx, taskID, "step.completed", event.StepCompleted{
+		Step:       step.Name,
+		Status:     string(sr.Status),
+		DurationMs: sr.Duration.Milliseconds(),
+		TokensUsed: sr.TokensUsed,
+	})
+	return sr
+}
+
+// hasAgentSteps returns true if the workflow contains any agent-type steps.
+func hasAgentSteps(wf *Workflow) bool {
+	for i := range wf.Steps {
+		if wf.Steps[i].Type == StepAgent {
+			return true
+		}
+	}
+	return false
 }
 
 // emit publishes an event to both the store (for persistence) and the bus (for real-time delivery).
