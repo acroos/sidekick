@@ -8,6 +8,7 @@ import (
 
 	"github.com/austinroos/sidekick/internal/event"
 	"github.com/austinroos/sidekick/internal/task"
+	"github.com/austinroos/sidekick/internal/ui"
 )
 
 // ServerConfig configures the API server.
@@ -37,20 +38,6 @@ func NewServer(cfg ServerConfig) *Server {
 		eventStore: cfg.EventStore,
 		apiKey:     cfg.APIKey,
 	}
-}
-
-// Start begins listening and serving HTTP requests.
-// It returns the actual listen address (useful when port 0 is used).
-func (s *Server) Start() (string, error) {
-	ln, err := net.Listen("tcp", s.httpServer.Addr)
-	if err != nil {
-		return "", err
-	}
-	s.listener = ln
-
-	go func() { _ = s.httpServer.Serve(ln) }()
-
-	return ln.Addr().String(), nil
 }
 
 // ListenAndServe sets up the server and begins serving. Call this from main.
@@ -89,11 +76,19 @@ func (s *Server) Shutdown(ctx context.Context) error {
 
 // routes configures the HTTP mux with all API routes.
 func (s *Server) routes() http.Handler {
+	// API routes require authentication.
+	apiMux := http.NewServeMux()
+	apiMux.HandleFunc("POST /tasks", s.handleCreateTask)
+	apiMux.HandleFunc("GET /tasks", s.handleListTasks)
+	apiMux.HandleFunc("GET /tasks/{id}", s.handleGetTask)
+	apiMux.HandleFunc("POST /tasks/{id}/cancel", s.handleCancelTask)
+	apiMux.HandleFunc("GET /tasks/{id}/stream", s.handleStreamEvents)
+
+	// Top-level mux: UI is public, API is authenticated.
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /tasks", s.handleCreateTask)
-	mux.HandleFunc("GET /tasks", s.handleListTasks)
-	mux.HandleFunc("GET /tasks/{id}", s.handleGetTask)
-	mux.HandleFunc("POST /tasks/{id}/cancel", s.handleCancelTask)
-	mux.HandleFunc("GET /tasks/{id}/stream", s.handleStreamEvents)
-	return s.authMiddleware(mux)
+	mux.Handle("/tasks", s.authMiddleware(apiMux))
+	mux.Handle("/tasks/", s.authMiddleware(apiMux))
+	mux.Handle("/", ui.Handler())
+
+	return requestLoggingMiddleware(mux)
 }

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 )
@@ -25,7 +25,7 @@ func SendWebhook(webhookURL string, t *Task) {
 
 	body, err := json.Marshal(payload)
 	if err != nil {
-		log.Printf("webhook: marshal error: %v", err)
+		slog.Error("webhook marshal error", "error", err)
 		return
 	}
 
@@ -34,19 +34,19 @@ func SendWebhook(webhookURL string, t *Task) {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, webhookURL, bytes.NewReader(body))
 	if err != nil {
-		log.Printf("webhook: request error: %v", err)
+		slog.Error("webhook request error", "error", err)
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		log.Printf("webhook: POST to %s failed: %v", webhookURL, err)
+		slog.Error("webhook POST failed", "url", webhookURL, "error", err)
 		return
 	}
 	_ = resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		log.Printf("webhook: POST to %s returned status %d", webhookURL, resp.StatusCode)
+		slog.Warn("webhook returned error status", "url", webhookURL, "status", resp.StatusCode)
 	}
 }

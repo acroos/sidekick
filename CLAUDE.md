@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Sidekick is an open-source platform for running autonomous coding agents in sandboxed environments. Teams self-host it on their own infrastructure and interact through an HTTP API that frontends (CLI, Slack bots, web UIs, GitHub Apps) build on top of.
 
-**Current status:** Pre-implementation. The design docs and ADRs are complete; no Go code exists yet. See PROJECT_PLAN.md for the phased delivery roadmap.
+**Current status:** Phase 5 (MVP Polish) complete. All core packages are implemented: sandbox provider, workflow engine, agent runtime, LLM proxy, event system, API server, task manager, CLI client, and embedded web UI. See PROJECT_PLAN.md for the phased delivery roadmap.
 
 ## Build Commands
 

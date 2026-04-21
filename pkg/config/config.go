@@ -27,6 +27,10 @@ type Config struct {
 	AnthropicBaseURL   string // Anthropic API base URL
 	DefaultTokenBudget int    // Default per-task token budget (0 = unlimited)
 
+	// Logging
+	LogFormat string // "text" or "json" (default "text")
+	LogLevel  string // "debug", "info", "warn", "error" (default "info")
+
 	// Timeouts
 	ShutdownTimeout time.Duration // Graceful shutdown deadline
 }
@@ -44,6 +48,8 @@ func Load() (*Config, error) {
 		AnthropicAPIKey:    os.Getenv("ANTHROPIC_API_KEY"),
 		AnthropicBaseURL:   envOrDefault("ANTHROPIC_BASE_URL", "https://api.anthropic.com"),
 		DefaultTokenBudget: envIntOrDefault("SIDEKICK_DEFAULT_TOKEN_BUDGET", 0),
+		LogFormat:          envOrDefault("SIDEKICK_LOG_FORMAT", "text"),
+		LogLevel:           envOrDefault("SIDEKICK_LOG_LEVEL", "info"),
 		ShutdownTimeout:    envDurationOrDefault("SIDEKICK_SHUTDOWN_TIMEOUT", 30*time.Second),
 	}
 
@@ -74,6 +80,24 @@ func envIntOrDefault(key string, defaultVal int) int {
 		return defaultVal
 	}
 	return n
+}
+
+// ClientConfig holds configuration for the CLI client.
+type ClientConfig struct {
+	ServerURL string // Sidekick server URL
+	APIKey    string // X-Sidekick-Key value
+}
+
+// LoadClient reads client configuration from environment variables.
+func LoadClient() (*ClientConfig, error) {
+	cfg := &ClientConfig{
+		ServerURL: envOrDefault("SIDEKICK_SERVER_URL", "http://localhost:8080"),
+		APIKey:    os.Getenv("SIDEKICK_API_KEY"),
+	}
+	if cfg.APIKey == "" {
+		return nil, fmt.Errorf("SIDEKICK_API_KEY is required")
+	}
+	return cfg, nil
 }
 
 func envDurationOrDefault(key string, defaultVal time.Duration) time.Duration {

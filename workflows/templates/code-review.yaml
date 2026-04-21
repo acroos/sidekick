@@ -1,0 +1,55 @@
+name: code-review
+timeout: 15m
+
+sandbox:
+  image: sidekick-sandbox-base:latest
+  network: restricted
+  allow_hosts:
+    - github.com
+
+steps:
+  - name: clone
+    type: deterministic
+    run: |
+      git clone $REPO_URL /workspace/repo
+      git -C /workspace/repo fetch origin $PR_BRANCH
+      git -C /workspace/repo checkout $PR_BRANCH
+    timeout: 2m
+    on_failure: abort
+
+  - name: diff
+    type: deterministic
+    run: |
+      git -C /workspace/repo diff origin/$BASE_BRANCH...$PR_BRANCH
+    timeout: 1m
+    on_failure: abort
+
+  - name: review
+    type: agent
+    context:
+      - type: variable
+        key: REVIEW_INSTRUCTIONS
+        label: "Review instructions"
+      - type: step_output
+        step: diff
+        output: stdout
+        label: "Diff to review"
+        max_lines: 500
+    prompt: |
+      You are reviewing a pull request in /workspace/repo.
+      The diff is provided in the context above.
+
+      Review the code changes thoroughly. Look for:
+      - Bugs, logic errors, or edge cases
+      - Security issues
+      - Performance concerns
+      - Style and readability issues
+
+      Output your review as structured feedback with sections for
+      issues found (with file and line references) and overall assessment.
+    allowed_tools:
+      - Read
+      - Glob
+      - Grep
+      - Bash
+    timeout: 10m

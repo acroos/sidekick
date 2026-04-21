@@ -1,0 +1,74 @@
+name: fix-issue
+timeout: 30m
+max_retries: 1
+
+sandbox:
+  image: sidekick-sandbox-base:latest
+  network: restricted
+  allow_hosts:
+    - github.com
+    - registry.npmjs.org
+    - pypi.org
+    - proxy.golang.org
+
+steps:
+  - name: clone
+    type: deterministic
+    run: |
+      git clone $REPO_URL /workspace/repo
+      git -C /workspace/repo checkout -b $BRANCH_NAME
+    timeout: 2m
+    on_failure: abort
+
+  - name: solve
+    type: agent
+    context:
+      - type: variable
+        key: TASK_DESCRIPTION
+        label: "Task"
+    prompt: |
+      You are working in /workspace/repo.
+      Solve the task described in the context above.
+      Make the minimal change needed. Do not refactor unrelated code.
+      Run tests to verify your fix before finishing.
+    allowed_tools:
+      - Edit
+      - Read
+      - Bash
+      - Glob
+      - Grep
+    timeout: 20m
+    on_failure: abort
+
+  - name: test
+    type: deterministic
+    run: |
+      cd /workspace/repo
+      if [ -f package.json ]; then npm test; fi
+      if [ -f go.mod ]; then go test ./...; fi
+      if [ -f Makefile ] && grep -q '^test:' Makefile; then make test; fi
+    timeout: 5m
+    on_failure: abort
+
+  - name: push
+    type: deterministic
+    when: steps.test.status == 'succeeded'
+    depends_on: [test]
+    run: |
+      git -C /workspace/repo add -A
+      git -C /workspace/repo commit -m "$COMMIT_MESSAGE"
+      git -C /workspace/repo push origin $BRANCH_NAME
+    timeout: 2m
+    on_failure: abort
+
+  - name: open-pr
+    type: deterministic
+    when: steps.push.status == 'succeeded'
+    depends_on: [push]
+    run: |
+      cd /workspace/repo
+      gh pr create \
+        --head $BRANCH_NAME \
+        --title "$COMMIT_MESSAGE" \
+        --body "Automated fix by Sidekick. See original task for context."
+    timeout: 1m

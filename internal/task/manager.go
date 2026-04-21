@@ -3,7 +3,7 @@ package task
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -183,7 +183,7 @@ func (m *Manager) executeTask(ctx context.Context, cancel context.CancelFunc, ta
 	// Update to running.
 	t, err := m.store.Get(context.Background(), taskID)
 	if err != nil || t == nil {
-		log.Printf("task %s: failed to load from store: %v", taskID, err)
+		slog.Error("failed to load task from store", "task_id", taskID, "error", err)
 		return
 	}
 
@@ -196,7 +196,7 @@ func (m *Manager) executeTask(ctx context.Context, cancel context.CancelFunc, ta
 	now := time.Now()
 	t.StartedAt = &now
 	if err := m.store.Update(context.Background(), t); err != nil {
-		log.Printf("task %s: failed to update to running: %v", taskID, err)
+		slog.Error("failed to update task to running", "task_id", taskID, "error", err)
 	}
 
 	// Execute workflow via the executor interface.
@@ -213,7 +213,7 @@ func (m *Manager) executeTask(ctx context.Context, cancel context.CancelFunc, ta
 	// Re-fetch to check if canceled during execution.
 	t, err = m.store.Get(context.Background(), taskID)
 	if err != nil || t == nil {
-		log.Printf("task %s: failed to reload from store: %v", taskID, err)
+		slog.Error("failed to reload task from store", "task_id", taskID, "error", err)
 		return
 	}
 
@@ -242,7 +242,7 @@ func (m *Manager) executeTask(ctx context.Context, cancel context.CancelFunc, ta
 	}
 
 	if err := m.store.Update(context.Background(), t); err != nil {
-		log.Printf("task %s: failed to persist result: %v", taskID, err)
+		slog.Error("failed to persist task result", "task_id", taskID, "error", err)
 	}
 
 	// Fire webhook.
