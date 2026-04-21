@@ -22,6 +22,17 @@ type Executor struct {
 	AgentRunner *agent.Runner // nil = agent steps fail gracefully
 }
 
+// RunWorkflow parses a workflow file and runs it for the given task.
+// This method satisfies the task.Executor interface, decoupling the task
+// manager from direct workflow package imports.
+func (e *Executor) RunWorkflow(ctx context.Context, taskID string, workflowPath string, variables map[string]string) (*task.Task, error) {
+	wf, err := ParseFile(workflowPath)
+	if err != nil {
+		return nil, fmt.Errorf("loading workflow: %w", err)
+	}
+	return e.Execute(ctx, taskID, wf, variables)
+}
+
 // Execute runs a workflow for the given task, returning the populated task result.
 func (e *Executor) Execute(ctx context.Context, taskID string, wf *Workflow, variables map[string]string) (*task.Task, error) {
 	// Validate before executing.

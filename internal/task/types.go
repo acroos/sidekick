@@ -13,7 +13,8 @@ type Task struct {
 	CreatedAt   time.Time
 	StartedAt   *time.Time
 	CompletedAt *time.Time
-	Error       string // Set if task failed
+	Error      string // Set if task failed
+	WebhookURL string // Optional webhook for completion notification
 }
 
 // Status represents the lifecycle state of a task.
