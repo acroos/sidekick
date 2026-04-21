@@ -28,3 +28,6 @@ Thumbs.db
 
 # ENV
 .env*
+
+# Claude Worktrees
+.claude/worktrees
