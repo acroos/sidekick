@@ -46,7 +46,7 @@ steps:
     type: deterministic
     run: echo hello
 `)
-	if err := os.WriteFile(filepath.Join(dir, "test-workflow.yaml"), content, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "test-workflow.yaml"), content, 0o644); err != nil {
 		t.Fatalf("writing test workflow: %v", err)
 	}
 	return dir

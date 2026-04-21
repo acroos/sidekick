@@ -19,7 +19,7 @@ import (
 const testAPIKey = "sk-test-key"
 
 // testServer creates an API server backed by real in-memory stores.
-func testServer(t *testing.T) (*httptest.Server, *task.Manager, *event.Bus, event.Store) {
+func testServer(t *testing.T) (*httptest.Server, event.Store) {
 	t.Helper()
 
 	taskStore, err := task.NewSQLiteStore(":memory:")
@@ -57,7 +57,7 @@ func testServer(t *testing.T) (*httptest.Server, *task.Manager, *event.Bus, even
 		_ = mgr.Shutdown(ctx)
 	})
 
-	return ts, mgr, eventBus, eventStore
+	return ts, eventStore
 }
 
 func setupTestWorkflowDir(t *testing.T) string {
@@ -72,7 +72,7 @@ steps:
     type: deterministic
     run: echo hello
 `)
-	if err := os.WriteFile(filepath.Join(dir, "test-workflow.yaml"), content, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "test-workflow.yaml"), content, 0o644); err != nil {
 		t.Fatalf("writing test workflow: %v", err)
 	}
 	return dir
@@ -85,7 +85,7 @@ func doRequest(t *testing.T, ts *httptest.Server, method, path, body string) *ht
 	if body != "" {
 		req, err = http.NewRequest(method, ts.URL+path, strings.NewReader(body))
 	} else {
-		req, err = http.NewRequest(method, ts.URL+path, nil)
+		req, err = http.NewRequest(method, ts.URL+path, http.NoBody)
 	}
 	if err != nil {
 		t.Fatalf("creating request: %v", err)
@@ -103,14 +103,14 @@ func doRequest(t *testing.T, ts *httptest.Server, method, path, body string) *ht
 }
 
 func TestAuth_MissingKey(t *testing.T) {
-	ts, _, _, _ := testServer(t)
+	ts, _ := testServer(t)
 
-	req, _ := http.NewRequest("GET", ts.URL+"/tasks", nil)
+	req, _ := http.NewRequest("GET", ts.URL+"/tasks", http.NoBody)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // test cleanup
 
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusUnauthorized)
@@ -118,15 +118,15 @@ func TestAuth_MissingKey(t *testing.T) {
 }
 
 func TestAuth_WrongKey(t *testing.T) {
-	ts, _, _, _ := testServer(t)
+	ts, _ := testServer(t)
 
-	req, _ := http.NewRequest("GET", ts.URL+"/tasks", nil)
+	req, _ := http.NewRequest("GET", ts.URL+"/tasks", http.NoBody)
 	req.Header.Set("X-Sidekick-Key", "wrong-key")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // test cleanup
 
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusUnauthorized)
@@ -134,15 +134,15 @@ func TestAuth_WrongKey(t *testing.T) {
 }
 
 func TestAuth_BearerToken(t *testing.T) {
-	ts, _, _, _ := testServer(t)
+	ts, _ := testServer(t)
 
-	req, _ := http.NewRequest("GET", ts.URL+"/tasks", nil)
+	req, _ := http.NewRequest("GET", ts.URL+"/tasks", http.NoBody)
 	req.Header.Set("Authorization", "Bearer "+testAPIKey)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // test cleanup
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusOK)
@@ -150,11 +150,11 @@ func TestAuth_BearerToken(t *testing.T) {
 }
 
 func TestCreateTask(t *testing.T) {
-	ts, _, _, _ := testServer(t)
+	ts, _ := testServer(t)
 
 	resp := doRequest(t, ts, "POST", "/tasks",
 		`{"workflow":"test-workflow","variables":{"FOO":"bar"}}`)
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // test cleanup
 
 	if resp.StatusCode != http.StatusCreated {
 		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusCreated)
@@ -176,10 +176,10 @@ func TestCreateTask(t *testing.T) {
 }
 
 func TestCreateTask_MissingWorkflow(t *testing.T) {
-	ts, _, _, _ := testServer(t)
+	ts, _ := testServer(t)
 
 	resp := doRequest(t, ts, "POST", "/tasks", `{"variables":{}}`)
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // test cleanup
 
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusBadRequest)
@@ -187,10 +187,10 @@ func TestCreateTask_MissingWorkflow(t *testing.T) {
 }
 
 func TestCreateTask_InvalidWorkflow(t *testing.T) {
-	ts, _, _, _ := testServer(t)
+	ts, _ := testServer(t)
 
 	resp := doRequest(t, ts, "POST", "/tasks", `{"workflow":"nonexistent"}`)
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // test cleanup
 
 	if resp.StatusCode != http.StatusUnprocessableEntity {
 		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusUnprocessableEntity)
@@ -198,36 +198,36 @@ func TestCreateTask_InvalidWorkflow(t *testing.T) {
 }
 
 func TestGetTask(t *testing.T) {
-	ts, _, _, _ := testServer(t)
+	ts, _ := testServer(t)
 
 	// Create a task first.
 	createResp := doRequest(t, ts, "POST", "/tasks",
 		`{"workflow":"test-workflow","variables":{}}`)
-	defer createResp.Body.Close()
+	defer createResp.Body.Close() //nolint:errcheck // test cleanup
 
 	var created task.TaskResponse
-	json.NewDecoder(createResp.Body).Decode(&created)
+	_ = json.NewDecoder(createResp.Body).Decode(&created)
 
 	// Get it.
 	resp := doRequest(t, ts, "GET", "/tasks/"+created.ID, "")
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // test cleanup
 
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusOK)
 	}
 
 	var got task.TaskResponse
-	json.NewDecoder(resp.Body).Decode(&got)
+	_ = json.NewDecoder(resp.Body).Decode(&got)
 	if got.ID != created.ID {
 		t.Errorf("ID = %q, want %q", got.ID, created.ID)
 	}
 }
 
 func TestGetTask_NotFound(t *testing.T) {
-	ts, _, _, _ := testServer(t)
+	ts, _ := testServer(t)
 
 	resp := doRequest(t, ts, "GET", "/tasks/nonexistent", "")
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // test cleanup
 
 	if resp.StatusCode != http.StatusNotFound {
 		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusNotFound)
@@ -235,34 +235,34 @@ func TestGetTask_NotFound(t *testing.T) {
 }
 
 func TestListTasks(t *testing.T) {
-	ts, _, _, _ := testServer(t)
+	ts, _ := testServer(t)
 
 	// Create two tasks.
-	doRequest(t, ts, "POST", "/tasks", `{"workflow":"test-workflow","variables":{}}`).Body.Close()
-	doRequest(t, ts, "POST", "/tasks", `{"workflow":"test-workflow","variables":{}}`).Body.Close()
+	_ = doRequest(t, ts, "POST", "/tasks", `{"workflow":"test-workflow","variables":{}}`).Body.Close()
+	_ = doRequest(t, ts, "POST", "/tasks", `{"workflow":"test-workflow","variables":{}}`).Body.Close()
 
 	resp := doRequest(t, ts, "GET", "/tasks", "")
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // test cleanup
 
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusOK)
 	}
 
 	var tasks []task.TaskResponse
-	json.NewDecoder(resp.Body).Decode(&tasks)
+	_ = json.NewDecoder(resp.Body).Decode(&tasks)
 	if len(tasks) < 2 {
 		t.Errorf("got %d tasks, want >= 2", len(tasks))
 	}
 }
 
 func TestListTasks_Empty(t *testing.T) {
-	ts, _, _, _ := testServer(t)
+	ts, _ := testServer(t)
 
 	resp := doRequest(t, ts, "GET", "/tasks", "")
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // test cleanup
 
 	var tasks []task.TaskResponse
-	json.NewDecoder(resp.Body).Decode(&tasks)
+	_ = json.NewDecoder(resp.Body).Decode(&tasks)
 
 	// Should be empty array, not null.
 	if tasks == nil {
@@ -271,18 +271,18 @@ func TestListTasks_Empty(t *testing.T) {
 }
 
 func TestCancelTask(t *testing.T) {
-	ts, _, _, _ := testServer(t)
+	ts, _ := testServer(t)
 
 	// Create a task.
 	createResp := doRequest(t, ts, "POST", "/tasks",
 		`{"workflow":"test-workflow","variables":{}}`)
 	var created task.TaskResponse
-	json.NewDecoder(createResp.Body).Decode(&created)
-	createResp.Body.Close()
+	_ = json.NewDecoder(createResp.Body).Decode(&created)
+	_ = createResp.Body.Close()
 
 	// Cancel it.
 	resp := doRequest(t, ts, "POST", "/tasks/"+created.ID+"/cancel", "")
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // test cleanup
 
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusOK)
@@ -290,10 +290,10 @@ func TestCancelTask(t *testing.T) {
 }
 
 func TestCancelTask_NotFound(t *testing.T) {
-	ts, _, _, _ := testServer(t)
+	ts, _ := testServer(t)
 
 	resp := doRequest(t, ts, "POST", "/tasks/nonexistent/cancel", "")
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // test cleanup
 
 	if resp.StatusCode != http.StatusNotFound {
 		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusNotFound)
@@ -301,23 +301,16 @@ func TestCancelTask_NotFound(t *testing.T) {
 }
 
 func TestSSE_ReplayEvents(t *testing.T) {
-	ts, _, _, eventStore := testServer(t)
-
-	// Insert some events directly into the store.
+	ts, eventStore := testServer(t)
 	ctx := context.Background()
-	taskID := "task_sse_test"
 
-	// Create the task in the task store via the API isn't practical here,
-	// so create it directly in the store used by the manager.
-	// Instead, let's test with a task that exists.
-
-	// First create a task via the API.
+	// Create a task via the API.
 	createResp := doRequest(t, ts, "POST", "/tasks",
 		`{"workflow":"test-workflow","variables":{}}`)
 	var created task.TaskResponse
-	json.NewDecoder(createResp.Body).Decode(&created)
-	createResp.Body.Close()
-	taskID = created.ID
+	_ = json.NewDecoder(createResp.Body).Decode(&created)
+	_ = createResp.Body.Close()
+	taskID := created.ID
 
 	// Wait a moment for the goroutine to process.
 	time.Sleep(50 * time.Millisecond)
@@ -345,7 +338,7 @@ func TestSSE_ReplayEvents(t *testing.T) {
 	}
 
 	// Connect to SSE endpoint.
-	req, _ := http.NewRequest("GET", ts.URL+"/tasks/"+taskID+"/stream", nil)
+	req, _ := http.NewRequest("GET", ts.URL+"/tasks/"+taskID+"/stream", http.NoBody)
 	req.Header.Set("X-Sidekick-Key", testAPIKey)
 	req.Header.Set("Accept", "text/event-stream")
 
@@ -353,7 +346,7 @@ func TestSSE_ReplayEvents(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SSE request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // test cleanup
 
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusOK)
@@ -385,15 +378,15 @@ func TestSSE_ReplayEvents(t *testing.T) {
 }
 
 func TestSSE_TypeFilter(t *testing.T) {
-	ts, _, _, eventStore := testServer(t)
+	ts, eventStore := testServer(t)
 	ctx := context.Background()
 
 	// Create task via API.
 	createResp := doRequest(t, ts, "POST", "/tasks",
 		`{"workflow":"test-workflow","variables":{}}`)
 	var created task.TaskResponse
-	json.NewDecoder(createResp.Body).Decode(&created)
-	createResp.Body.Close()
+	_ = json.NewDecoder(createResp.Body).Decode(&created)
+	_ = createResp.Body.Close()
 
 	time.Sleep(50 * time.Millisecond)
 
@@ -408,18 +401,18 @@ func TestSSE_TypeFilter(t *testing.T) {
 		{"task.completed", `{"status":"succeeded"}`},
 	} {
 		evt := &event.Event{Type: e.t, Timestamp: time.Now(), Data: json.RawMessage(e.data)}
-		eventStore.Append(ctx, created.ID, evt)
+		_, _ = eventStore.Append(ctx, created.ID, evt)
 	}
 
 	// Connect with type filter — only step.started and task.completed.
-	req, _ := http.NewRequest("GET", ts.URL+"/tasks/"+created.ID+"/stream?types=step.started,task.completed", nil)
+	req, _ := http.NewRequest("GET", ts.URL+"/tasks/"+created.ID+"/stream?types=step.started,task.completed", http.NoBody)
 	req.Header.Set("X-Sidekick-Key", testAPIKey)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("SSE request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // test cleanup
 
 	scanner := bufio.NewScanner(resp.Body)
 	var receivedEvents []string
@@ -442,15 +435,15 @@ func TestSSE_TypeFilter(t *testing.T) {
 }
 
 func TestSSE_LastEventID(t *testing.T) {
-	ts, _, _, eventStore := testServer(t)
+	ts, eventStore := testServer(t)
 	ctx := context.Background()
 
 	// Create task.
 	createResp := doRequest(t, ts, "POST", "/tasks",
 		`{"workflow":"test-workflow","variables":{}}`)
 	var created task.TaskResponse
-	json.NewDecoder(createResp.Body).Decode(&created)
-	createResp.Body.Close()
+	_ = json.NewDecoder(createResp.Body).Decode(&created)
+	_ = createResp.Body.Close()
 
 	time.Sleep(50 * time.Millisecond)
 
@@ -465,11 +458,11 @@ func TestSSE_LastEventID(t *testing.T) {
 		{"task.completed", `{"status":"succeeded"}`},
 	} {
 		evt := &event.Event{Type: e.t, Timestamp: time.Now(), Data: json.RawMessage(e.data)}
-		eventStore.Append(ctx, created.ID, evt)
+		_, _ = eventStore.Append(ctx, created.ID, evt)
 	}
 
 	// Connect with Last-Event-ID: 2 — should skip first 2 events.
-	req, _ := http.NewRequest("GET", ts.URL+"/tasks/"+created.ID+"/stream", nil)
+	req, _ := http.NewRequest("GET", ts.URL+"/tasks/"+created.ID+"/stream", http.NoBody)
 	req.Header.Set("X-Sidekick-Key", testAPIKey)
 	req.Header.Set("Last-Event-ID", "2")
 
@@ -477,7 +470,7 @@ func TestSSE_LastEventID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SSE request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // test cleanup
 
 	scanner := bufio.NewScanner(resp.Body)
 	var receivedEvents []string

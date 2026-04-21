@@ -25,7 +25,7 @@ type Executor struct {
 // RunWorkflow parses a workflow file and runs it for the given task.
 // This method satisfies the task.Executor interface, decoupling the task
 // manager from direct workflow package imports.
-func (e *Executor) RunWorkflow(ctx context.Context, taskID string, workflowPath string, variables map[string]string) (*task.Task, error) {
+func (e *Executor) RunWorkflow(ctx context.Context, taskID, workflowPath string, variables map[string]string) (*task.Task, error) {
 	wf, err := ParseFile(workflowPath)
 	if err != nil {
 		return nil, fmt.Errorf("loading workflow: %w", err)
@@ -282,7 +282,7 @@ func (e *Executor) runAgentStep(ctx context.Context, taskID string, sb sandbox.S
 		if err != nil {
 			return "", err
 		}
-		defer rc.Close()
+		defer rc.Close() //nolint:errcheck // best-effort cleanup
 		data, err := io.ReadAll(rc)
 		return string(data), err
 	}
@@ -316,13 +316,14 @@ func (e *Executor) runAgentStep(ctx context.Context, taskID string, sb sandbox.S
 		WorkDir:      "/workspace",
 	}, emitFn)
 
-	if err != nil {
+	switch {
+	case err != nil:
 		sr.Status = task.StatusFailed
 		sr.Stderr = fmt.Sprintf("agent error: %v", err)
-	} else if agentResult.ExitCode != 0 {
+	case agentResult.ExitCode != 0:
 		sr.Status = task.StatusFailed
 		sr.ExitCode = agentResult.ExitCode
-	} else {
+	default:
 		sr.Status = task.StatusSucceeded
 		sr.Stdout = agentResult.Output
 	}

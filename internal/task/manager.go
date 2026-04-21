@@ -155,7 +155,7 @@ func (m *Manager) Shutdown(ctx context.Context) error {
 }
 
 // executeTask runs a task through the workflow engine.
-func (m *Manager) executeTask(ctx context.Context, cancel context.CancelFunc, taskID string, workflowPath string, variables map[string]string) {
+func (m *Manager) executeTask(ctx context.Context, cancel context.CancelFunc, taskID, workflowPath string, variables map[string]string) {
 	defer m.wg.Done()
 	defer func() {
 		cancel()

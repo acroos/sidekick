@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func testAPIServer(t *testing.T) (*httptest.Server, string) {
+func testAPIServer(t *testing.T) (ts *httptest.Server, apiKey string) {
 	t.Helper()
 
 	mux := http.NewServeMux()
@@ -16,12 +16,12 @@ func testAPIServer(t *testing.T) (*httptest.Server, string) {
 	mux.HandleFunc("POST /tasks", func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("X-Sidekick-Key") != "test-key" {
 			w.WriteHeader(http.StatusUnauthorized)
-			json.NewEncoder(w).Encode(map[string]string{"error": "unauthorized"})
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "unauthorized"})
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(TaskResponse{
+		_ = json.NewEncoder(w).Encode(TaskResponse{
 			ID:          "task_123",
 			Status:      "pending",
 			WorkflowRef: "fix-issue",
@@ -33,11 +33,11 @@ func testAPIServer(t *testing.T) (*httptest.Server, string) {
 		id := r.PathValue("id")
 		if id == "nonexistent" {
 			w.WriteHeader(http.StatusNotFound)
-			json.NewEncoder(w).Encode(map[string]string{"error": "task not found"})
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "task not found"})
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(TaskResponse{
+		_ = json.NewEncoder(w).Encode(TaskResponse{
 			ID:          id,
 			Status:      "running",
 			WorkflowRef: "fix-issue",
@@ -48,9 +48,9 @@ func testAPIServer(t *testing.T) (*httptest.Server, string) {
 		})
 	})
 
-	mux.HandleFunc("GET /tasks", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /tasks", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]*TaskResponse{
+		_ = json.NewEncoder(w).Encode([]*TaskResponse{
 			{ID: "task_1", Status: "succeeded", WorkflowRef: "fix-issue", CreatedAt: time.Now()},
 			{ID: "task_2", Status: "running", WorkflowRef: "code-review", CreatedAt: time.Now()},
 		})
@@ -58,25 +58,25 @@ func testAPIServer(t *testing.T) (*httptest.Server, string) {
 
 	mux.HandleFunc("POST /tasks/{id}/cancel", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(TaskResponse{
+		_ = json.NewEncoder(w).Encode(TaskResponse{
 			ID:     r.PathValue("id"),
 			Status: "canceled",
 		})
 	})
 
-	mux.HandleFunc("GET /tasks/{id}/stream", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /tasks/{id}/stream", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-cache")
 		w.WriteHeader(http.StatusOK)
 
 		flusher := w.(http.Flusher)
-		w.Write([]byte("event: step.started\nid: 1\ndata: {\"step\":\"hello\"}\n\n"))
+		_, _ = w.Write([]byte("event: step.started\nid: 1\ndata: {\"step\":\"hello\"}\n\n"))
 		flusher.Flush()
-		w.Write([]byte("event: task.completed\nid: 2\ndata: {\"status\":\"succeeded\"}\n\n"))
+		_, _ = w.Write([]byte("event: task.completed\nid: 2\ndata: {\"status\":\"succeeded\"}\n\n"))
 		flusher.Flush()
 	})
 
-	ts := httptest.NewServer(mux)
+	ts = httptest.NewServer(mux)
 	t.Cleanup(ts.Close)
 
 	return ts, "test-key"

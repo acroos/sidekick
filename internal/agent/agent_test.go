@@ -34,9 +34,9 @@ func (s *mockSandbox) ExecStream(_ context.Context, cmd sandbox.Command) (*sandb
 	return &sandbox.ExecStream{Output: output, Done: done}, nil
 }
 
-func (s *mockSandbox) CopyIn(_ context.Context, _, _ string) error          { return nil }
+func (s *mockSandbox) CopyIn(_ context.Context, _, _ string) error                { return nil }
 func (s *mockSandbox) CopyOut(_ context.Context, _ string) (io.ReadCloser, error) { return nil, nil }
-func (s *mockSandbox) Status() sandbox.Status                               { return sandbox.StatusReady }
+func (s *mockSandbox) Status() sandbox.Status                                     { return sandbox.StatusReady }
 
 // --- Tests ---
 

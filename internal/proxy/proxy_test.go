@@ -2,34 +2,11 @@ package proxy
 
 import (
 	"context"
-	"encoding/json"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 )
-
-// fakeAnthropic returns a test server that records requests and returns a canned response.
-func fakeAnthropic(t *testing.T, statusCode int, respBody any) (*httptest.Server, *http.Request) {
-	t.Helper()
-	var captured *http.Request
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Read and discard body so it's fully consumed.
-		bodyBytes, _ := io.ReadAll(r.Body)
-		r.Body.Close()
-		// Store a shallow copy with the body available as a string in Header for inspection.
-		clone := r.Clone(r.Context())
-		clone.Header.Set("X-Captured-Body", string(bodyBytes))
-		captured = clone
-
-		w.WriteHeader(statusCode)
-		data, _ := json.Marshal(respBody)
-		_, _ = w.Write(data)
-	}))
-	t.Cleanup(srv.Close)
-	return srv, captured
-}
 
 func startProxy(t *testing.T, apiKey, baseURL string) *Proxy {
 	t.Helper()
@@ -65,7 +42,7 @@ func TestProxyInjectsAuth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request: %v", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // test cleanup
 
 	if resp.StatusCode != 200 {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
@@ -97,7 +74,7 @@ func TestProxyStripsTaskPrefix(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request: %v", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // test cleanup
 
 	if capturedPath != "/v1/messages" {
 		t.Fatalf("expected /v1/messages upstream, got %q", capturedPath)
@@ -121,7 +98,7 @@ func TestProxyTracksTokensNonStreaming(t *testing.T) {
 		if err != nil {
 			t.Fatalf("request: %v", err)
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 	}
 
 	input, output := p.TokensUsed("task-1")
@@ -149,7 +126,7 @@ func TestProxyBudgetExceeded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request 1: %v", err)
 	}
-	resp1.Body.Close()
+	_ = resp1.Body.Close()
 
 	// Second request should be rejected — budget exceeded (110 >= 100).
 	resp2, err := http.Post("http://"+p.cfg.ListenAddr+"/proxy/task-1/v1/messages",
@@ -157,7 +134,7 @@ func TestProxyBudgetExceeded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request 2: %v", err)
 	}
-	defer resp2.Body.Close()
+	defer resp2.Body.Close() //nolint:errcheck // test cleanup
 
 	if resp2.StatusCode != http.StatusTooManyRequests {
 		t.Fatalf("expected 429, got %d", resp2.StatusCode)
@@ -179,7 +156,7 @@ func TestProxyRegisterUnregister(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request: %v", err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	input, output := p.UnregisterTask("task-1")
 	if input != 42 || output != 18 {
@@ -202,7 +179,7 @@ func TestProxyUnknownTask(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request: %v", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // test cleanup
 
 	if resp.StatusCode != http.StatusTooManyRequests {
 		t.Fatalf("expected 429 for unknown task, got %d", resp.StatusCode)
@@ -216,7 +193,7 @@ func TestProxyMissingTaskID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request: %v", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // test cleanup
 
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", resp.StatusCode)

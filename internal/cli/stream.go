@@ -10,12 +10,12 @@ import (
 
 // StreamEvents connects to the SSE endpoint and prints formatted events to the writer.
 // It blocks until the stream ends (task.completed) or an error occurs.
-func StreamEvents(c *Client, taskID string, types string, w io.Writer) error {
+func StreamEvents(c *Client, taskID, types string, w io.Writer) error {
 	resp, err := c.StreamResponse(taskID, types, "")
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // best-effort cleanup
 
 	scanner := bufio.NewScanner(resp.Body)
 
@@ -40,7 +40,7 @@ func StreamEvents(c *Client, taskID string, types string, w io.Writer) error {
 			data := strings.Join(dataLines, "\n")
 			formatted := FormatEvent(eventType, json.RawMessage(data))
 			if formatted != "" {
-				fmt.Fprintln(w, formatted)
+				_, _ = fmt.Fprintln(w, formatted)
 			}
 
 			if eventType == "task.completed" {

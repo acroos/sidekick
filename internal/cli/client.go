@@ -112,13 +112,13 @@ func (c *Client) Cancel(taskID string) (*TaskResponse, error) {
 
 // StreamResponse returns a raw HTTP response for SSE streaming.
 // The caller must close the response body.
-func (c *Client) StreamResponse(taskID string, types string, lastEventID string) (*http.Response, error) {
+func (c *Client) StreamResponse(taskID, types, lastEventID string) (*http.Response, error) {
 	path := "/tasks/" + taskID + "/stream"
 	if types != "" {
 		path += "?types=" + url.QueryEscape(types)
 	}
 
-	req, err := http.NewRequest("GET", c.baseURL+path, nil)
+	req, err := http.NewRequest("GET", c.baseURL+path, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
@@ -136,14 +136,14 @@ func (c *Client) StreamResponse(taskID string, types string, lastEventID string)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		defer resp.Body.Close()
+		defer resp.Body.Close() //nolint:errcheck // best-effort cleanup
 		return nil, parseErrorResponse(resp)
 	}
 
 	return resp, nil
 }
 
-func (c *Client) do(method, path string, body any, result any) error {
+func (c *Client) do(method, path string, body, result any) error {
 	var bodyReader io.Reader
 	if body != nil {
 		data, err := json.Marshal(body)
@@ -166,7 +166,7 @@ func (c *Client) do(method, path string, body any, result any) error {
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // best-effort cleanup
 
 	if resp.StatusCode >= 400 {
 		return parseErrorResponse(resp)
