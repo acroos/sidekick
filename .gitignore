@@ -1,16 +1,13 @@
-# Binaries
-/sidekick
-*.exe
-*.dll
-*.so
-*.dylib
+# Dependencies
+node_modules/
 
-# Test binary
-*.test
+# Build output
+dist/
 
-# Coverage
-coverage.out
-coverage.html
+# Environment
+.env
+.env.*
+!.env.example
 
 # IDE
 .idea/
@@ -22,12 +19,8 @@ coverage.html
 .DS_Store
 Thumbs.db
 
-# Build output
-/bin/
-/dist/
-
-# ENV
-.env*
+# Config with secrets (use sidekick.example.yaml as template)
+sidekick.yaml
 
 # Claude Worktrees
 .claude/worktrees

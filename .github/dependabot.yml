@@ -1,14 +1,7 @@
 version: 2
 updates:
-  - package-ecosystem: gomod
+  - package-ecosystem: npm
     directory: /
-    schedule:
-      interval: weekly
-    commit-message:
-      prefix: "deps"
-
-  - package-ecosystem: docker
-    directory: /images/base
     schedule:
       interval: weekly
     commit-message:
