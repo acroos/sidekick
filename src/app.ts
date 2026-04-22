@@ -2,13 +2,19 @@ import { Hono } from "hono";
 import type { GitHubClient } from "./github/client.js";
 import { createGitHubRoutes } from "./routes/github.js";
 import { healthRoutes } from "./routes/health.js";
+import { createLinearRoutes } from "./routes/linear.js";
 import { createRunsRoutes } from "./routes/runs.js";
+import type { AutomationService } from "./services/automations.js";
+import type { NotificationService } from "./services/notifications.js";
 import type { RunService } from "./services/runs.js";
 
 export interface AppDeps {
 	runService: RunService;
 	githubClient: GitHubClient;
 	githubWebhookSecret: string;
+	automationService: AutomationService;
+	notificationService: NotificationService;
+	linearWebhookSecret: string;
 }
 
 /**
@@ -25,6 +31,14 @@ export function createApp(deps: AppDeps) {
 			runService: deps.runService,
 			githubClient: deps.githubClient,
 			webhookSecret: deps.githubWebhookSecret,
+			notificationService: deps.notificationService,
+		}),
+	);
+	app.route(
+		"/api",
+		createLinearRoutes({
+			automationService: deps.automationService,
+			webhookSecret: deps.linearWebhookSecret,
 		}),
 	);
 	app.route(

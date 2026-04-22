@@ -4,12 +4,14 @@ import {
 	parseWorkflowRunEvent,
 	verifyWebhookSignature,
 } from "../github/webhook.js";
+import type { NotificationService } from "../services/notifications.js";
 import type { RunService } from "../services/runs.js";
 
 interface GitHubRoutesDeps {
 	runService: RunService;
 	githubClient: GitHubClient;
 	webhookSecret: string;
+	notificationService?: NotificationService;
 }
 
 export function createGitHubRoutes(deps: GitHubRoutesDeps) {
@@ -68,6 +70,11 @@ export function createGitHubRoutes(deps: GitHubRoutesDeps) {
 				await deps.runService.updateStatus(run.id, newStatus, {
 					result,
 				});
+
+				// Deliver notifications for the completed run
+				if (deps.notificationService) {
+					await deps.notificationService.deliverNotifications(run.id);
+				}
 				break;
 			}
 		}
