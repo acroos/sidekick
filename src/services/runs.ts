@@ -200,13 +200,47 @@ export class RunService {
 	}
 
 	/**
-	 * Mark a notification as sent or failed.
+	 * Get failed notifications that are eligible for retry.
+	 */
+	async getRetryableNotifications() {
+		return this.db.query.runNotifications.findMany({
+			where: eq(runNotifications.status, "failed"),
+		});
+	}
+
+	/**
+	 * Mark a notification as sent or failed. On failure, increment retry count
+	 * and reset to pending if retries remain.
 	 */
 	async updateNotificationStatus(
 		notificationId: string,
 		status: "sent" | "failed",
 		error?: string,
 	) {
+		if (status === "failed") {
+			// Fetch current state to check retry eligibility
+			const current = await this.db.query.runNotifications.findFirst({
+				where: eq(runNotifications.id, notificationId),
+			});
+
+			if (current) {
+				const newRetryCount = current.retryCount + 1;
+				const hasRetriesLeft = newRetryCount < current.maxRetries;
+
+				const [updated] = await this.db
+					.update(runNotifications)
+					.set({
+						status: hasRetriesLeft ? "pending" : "failed",
+						error: error ?? null,
+						retryCount: newRetryCount,
+					})
+					.where(eq(runNotifications.id, notificationId))
+					.returning();
+
+				return updated ?? null;
+			}
+		}
+
 		const [updated] = await this.db
 			.update(runNotifications)
 			.set({

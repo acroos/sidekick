@@ -1,5 +1,6 @@
 import type { LinearClient } from "../connectors/linear/client.js";
 import type { WorkflowRunResult } from "../github/client.js";
+import { logger } from "../middleware/logger.js";
 import type { RunService } from "./runs.js";
 
 export class NotificationService {
@@ -21,6 +22,11 @@ export class NotificationService {
 			try {
 				await this.deliverOne(notification, run);
 				await this.runService.updateNotificationStatus(notification.id, "sent");
+				logger.info("notification delivered", {
+					notification_id: notification.id,
+					connector: notification.connector,
+					run_id: runId,
+				});
 			} catch (err) {
 				const message = err instanceof Error ? err.message : "Unknown error";
 				await this.runService.updateNotificationStatus(
@@ -28,6 +34,12 @@ export class NotificationService {
 					"failed",
 					message,
 				);
+				logger.warn("notification delivery failed", {
+					notification_id: notification.id,
+					connector: notification.connector,
+					run_id: runId,
+					error: message,
+				});
 			}
 		}
 	}

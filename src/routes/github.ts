@@ -4,6 +4,7 @@ import {
 	parseWorkflowRunEvent,
 	verifyWebhookSignature,
 } from "../github/webhook.js";
+import { logger } from "../middleware/logger.js";
 import type { NotificationService } from "../services/notifications.js";
 import type { RunService } from "../services/runs.js";
 
@@ -47,6 +48,12 @@ export function createGitHubRoutes(deps: GitHubRoutesDeps) {
 			// This workflow run wasn't dispatched by us
 			return c.json({ ok: true, ignored: true });
 		}
+
+		logger.info("github webhook: processing workflow_run", {
+			action: event.action,
+			github_run_id: event.workflowRun.id,
+			run_id: run.id,
+		});
 
 		switch (event.action) {
 			case "queued":
