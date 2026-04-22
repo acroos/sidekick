@@ -22,7 +22,7 @@ const notificationSchema = z.object({
 	connector: z.string(),
 	comment: z.boolean().optional(),
 	update_status: z.boolean().optional(),
-	status_mapping: z.record(z.string()).optional(),
+	status_mapping: z.record(z.string(), z.string()).optional(),
 	thread_reply: z.boolean().optional(),
 	create_issue: z.boolean().optional(),
 	team: z.string().optional(),
@@ -45,7 +45,7 @@ const githubConfigSchema = z.object({
 
 export const configSchema = z.object({
 	github: githubConfigSchema,
-	connectors: z.record(connectorConfigSchema).default({}),
+	connectors: z.record(z.string(), connectorConfigSchema).default({}),
 	automations: z.array(automationSchema).default([]),
 });
 
