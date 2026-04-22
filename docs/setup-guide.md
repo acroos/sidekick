@@ -117,7 +117,7 @@ Save this value — you'll use it again when configuring the GitHub webhook in S
 
 ### `LINEAR_API_KEY`
 
-1. Go to [linear.app/settings/api](https://linear.app/settings/api)
+1. Go to [linear.app/your-workspace/settings/account/security](https://linear.app/austin-roos/settings/account/security)
 2. Under **Personal API keys**, create a new key
 3. Copy the key (starts with `lin_api_`)
 
