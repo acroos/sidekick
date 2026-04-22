@@ -11,7 +11,7 @@ The real gap isn't execution. It's **connectivity**. There's no good way to trig
 An integration hub that connects productivity and operational tools to Claude Code GitHub Action runs.
 
 ```
-┌─────────────┐     ┌──────────────────┐     ┌─────────────────────┐
+┌──────────────┐     ┌──────────────────┐     ┌─────────────────────┐
 │   Linear     │◀───▶│                  │────▶│  GitHub Actions     │
 │   Slack      │◀───▶│    Sidekick      │     │  (claude-code-action│
 │   PagerDuty  │◀───▶│                  │     │   workflow)         │
@@ -22,8 +22,8 @@ An integration hub that connects productivity and operational tools to Claude Co
                               │
                               ▼
                      ┌────────────────┐
-                     │   Postgres      │
-                     │   (run state)   │
+                     │   Postgres     │
+                     │   (run state)  │
                      └────────────────┘
 ```
 
@@ -33,13 +33,13 @@ An integration hub that connects productivity and operational tools to Claude Co
 
 ## Technology
 
-| Choice | Rationale |
-|--------|-----------|
-| **TypeScript** | First-class SDKs for Linear, Slack, GitHub (Octokit). JSON-native. Fast iteration on integration/glue code. |
-| **Hono** | Lightweight, fast, portable across runtimes. Runs on Vercel out of the box. |
-| **Vercel** | Primary deployment target. Serverless functions, zero infrastructure management, automatic scaling. |
-| **Postgres** | Durable state tracking for run mappings. Managed options everywhere (Neon, Supabase, Vercel Postgres). Supports richer queries as the system grows. |
-| **YAML** | Configuration format for connector definitions. Familiar, readable, already used in the ecosystem. |
+| Choice         | Rationale                                                                                                                                           |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **TypeScript** | First-class SDKs for Linear, Slack, GitHub (Octokit). JSON-native. Fast iteration on integration/glue code.                                         |
+| **Hono**       | Lightweight, fast, portable across runtimes. Runs on Vercel out of the box.                                                                         |
+| **Vercel**     | Primary deployment target. Serverless functions, zero infrastructure management, automatic scaling.                                                 |
+| **Postgres**   | Durable state tracking for run mappings. Managed options everywhere (Neon, Supabase, Vercel Postgres). Supports richer queries as the system grows. |
+| **YAML**       | Configuration format for connector definitions. Familiar, readable, already used in the ecosystem.                                                  |
 
 ## Core concepts
 
@@ -56,12 +56,13 @@ Connectors are modular. Adding a new tool means implementing its inbound/outboun
 ### Trigger conditions
 
 Each connector defines configurable trigger conditions. For example, the Linear connector might trigger on:
+
 - A specific label being applied (e.g., `sidekick`)
 - A comment containing a command (e.g., `/sidekick investigate`)
 - An issue moving to a specific status
 - A combination of the above
 
-The trigger condition determines *when* to act. The context configuration determines *what data* flows to the GitHub Action.
+The trigger condition determines _when_ to act. The context configuration determines _what data_ flows to the GitHub Action.
 
 ### Context extraction
 
@@ -86,10 +87,25 @@ The level of detail is configurable per connector.
 
 ## Configuration
 
-A single YAML config file defines active connectors and their behavior:
+### Deployment model
+
+Sidekick is currently designed as a **self-deployed** application. The team deploying Sidekick is the team using it. The deployment consists of:
+
+1. **This repo** — Sidekick source code + `sidekick.yaml` config, deployed to Vercel
+2. **Target repo(s)** — The codebases where claude-code-action runs, each with a GitHub Actions workflow file
+
+Future consideration: a managed/multi-tenant model where teams connect through a UI and config is stored per-tenant in the database (encrypted). The YAML-first approach keeps things simple now while the core abstractions (connectors, config schema) remain compatible with a database-backed config store later.
+
+### Config file
+
+A `sidekick.yaml` file in the repo root defines active connectors and their behavior. This file is committed to the repo — it contains **no secrets**, only `${VAR}` references that resolve against environment variables at startup.
+
+Secrets (API keys, webhook signing secrets) live in:
+- **Vercel:** Environment Variables dashboard (per-environment: production/preview/development)
+- **Local dev:** `.env` file (gitignored)
 
 ```yaml
-# sidekick.yaml
+# sidekick.yaml — committed to repo, no secrets
 github:
   token: ${GITHUB_TOKEN}
   # Default repo for workflow dispatches (connectors can override)
@@ -118,8 +134,8 @@ connectors:
 
     results:
       # How to report back
-      comment: true           # Post a comment with the summary
-      update_status: true     # Move issue to "In Review" on PR creation
+      comment: true # Post a comment with the summary
+      update_status: true # Move issue to "In Review" on PR creation
       status_mapping:
         pr_created: "In Review"
         completed: "Done"
@@ -129,7 +145,7 @@ connectors:
     # repo: "org/other-repo"
 ```
 
-Environment variables are referenced with `${VAR}` syntax and resolved at startup.
+The config loader resolves all `${VAR}` references at startup and fails loudly if any referenced variable is missing.
 
 ## API routes
 
