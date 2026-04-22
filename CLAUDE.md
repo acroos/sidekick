@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Sidekick is an integration hub that connects productivity tools (Linear, Slack, etc.) to Claude Code GitHub Action runs. It receives webhooks from external tools, triggers claude-code-action workflows via GitHub Actions, and routes results back to the originating tools.
 
-**Current status:** Phase 1 (Foundation) in progress. See PROJECT_PIVOT_PLAN.md for the full roadmap.
+**Current status:** Phase 1 (Foundation) complete. See `wiki/roadmap.md` for the full roadmap.
 
 ## Build Commands
 
@@ -69,6 +69,6 @@ Key source layout:
 - **Runs** — A triggered workflow execution. Tracked in Postgres with status lifecycle: triggered → queued → running → completed/failed.
 - **Notifications** — Per-target result delivery. Each notification tracks its own status (pending/sent/failed) for retry handling.
 
-## Decisions
+## Wiki
 
-Architecture Decision Records live in `docs/decisions/`. Reference these when working in related areas.
+Detailed documentation lives in `wiki/`. See `wiki/index.md` for a catalog of all pages. When building new features or changing architecture, update the relevant wiki pages to reflect the current state.

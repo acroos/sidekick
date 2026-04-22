@@ -1,100 +1,131 @@
 # Sidekick
 
-An open-source platform for running autonomous coding agents in sandboxed environments. Teams self-host Sidekick on their own infrastructure and interact through an HTTP API that frontends (CLIs, Slack bots, web UIs, GitHub Apps) build on top of.
+An integration hub that connects productivity tools to [Claude Code GitHub Action](https://github.com/anthropics/claude-code-action) runs. Sidekick receives webhooks from tools like Linear and Slack, triggers agent workflows in GitHub Actions, and routes results back to where the work originated.
 
-> **Status: v0** — All core packages are implemented and working end-to-end. See [PROJECT_PLAN.md](PROJECT_PLAN.md) for the roadmap.
+Label a Linear issue → Claude Code runs in GitHub Actions → results posted back as a comment.
 
-## What It Does
-
-You define **workflows** as YAML files containing a DAG of steps:
-
-- **Deterministic steps** run shell commands in a sandbox (clone, install, test, push)
-- **Agent steps** run Claude Code sessions that write and edit code autonomously
-
-Sidekick orchestrates the workflow inside a hardened Docker container, streams real-time events via SSE, and exposes results through a REST API.
-
-```bash
-# Submit a task and watch it run
-sidekick submit --workflow fix-issue --var REPO_URL=... --var ISSUE_NUMBER=42
-sidekick logs --follow <task-id>
-```
-
-## Design Goals
-
-- **Safety first** — agents run in locked-down Docker containers with no ambient access to production systems
-- **Agentic + deterministic** — combine LLM reasoning with scripted steps that always behave correctly
-- **Bounded execution** — every task has time and token budgets; agents cannot run forever
-- **Simple API, composable frontends** — the core is an HTTP service; UIs are separate concerns
-- **Self-hosted** — single binary, minimal dependencies, easy to operate
-
-## Architecture
-
-Sidekick is a layered system. Frontends talk to the API server, which manages tasks and dispatches them to the workflow engine. The workflow engine runs each step inside an isolated sandbox.
+## How It Works
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  Frontends:  CLI · Web UI · Slack Bot · GitHub App      │
-└────────────────────────┬────────────────────────────────┘
-                         │ REST + SSE
-┌────────────────────────▼────────────────────────────────┐
-│  API Server  (internal/api)                             │
-│  Routes, auth, SSE streaming with replay                │
-└────────────────────────┬────────────────────────────────┘
-                         │
-┌────────────────────────▼────────────────────────────────┐
-│  Task Manager  (internal/task)                          │
-│  SQLite persistence, worker pool, lifecycle             │
-└────────────────────────┬────────────────────────────────┘
-                         │
-┌────────────────────────▼────────────────────────────────┐
-│  Workflow Engine  (internal/workflow)                    │
-│  YAML parser, DAG builder, conditional execution        │
-└──────────┬──────────────────────────┬───────────────────┘
-           │                          │
-   deterministic steps           agent steps
-           │                          │
-           │              ┌───────────▼───────────────┐
-           │              │  Agent Runtime             │
-           │              │  (internal/agent)          │
-           │              │  Runs Claude Code inside   │
-           │              │  sandbox, parses output    │
-           │              │  into streamed events      │
-           │              └───────────┬───────────────┘
-           │                          │
-┌──────────▼──────────────────────────▼───────────────────┐
-│  Sandbox Provider  (internal/sandbox)                   │
-│  Docker containers with hardened security:              │
-│  dropped caps · no-new-privileges · read-only rootfs    │
-│  network isolation · resource limits · non-root user    │
-└──────────────────────────┬──────────────────────────────┘
-                           │ LLM traffic from agent steps
-┌──────────────────────────▼──────────────────────────────┐
-│  LLM Proxy  (internal/proxy)                            │
-│  Injects API key (never enters sandbox)                 │
-│  Enforces per-task token budgets                        │
-└─────────────────────────────────────────────────────────┘
+┌──────────────┐     ┌──────────────────┐     ┌─────────────────────┐
+│   Linear     │◀───▶│                  │────▶│  GitHub Actions     │
+│   Slack      │◀───▶│    Sidekick      │     │  (claude-code-action│
+│   PagerDuty  │◀───▶│                  │     │   workflow)         │
+│   ...        │     │  Receives events │     └─────────┬───────────┘
+└──────────────┘     │  Triggers runs   │               │
+                     │  Routes results  │◀──────────────┘
+                     └────────┬─────────┘   Completion webhooks
+                              │
+                              ▼
+                     ┌────────────────┐
+                     │   Postgres     │
+                     │   (run state)  │
+                     └────────────────┘
 ```
 
-Events flow in the opposite direction — every layer emits typed events (`task.*`, `step.*`, `agent.*`) that propagate up through an in-memory event bus, get persisted to SQLite, and stream to clients over SSE with `Last-Event-ID` replay support.
+**Inbound:** Receive webhook from tool → parse event → extract context → dispatch `workflow_dispatch` to GitHub Actions
 
-See [docs/DESIGN.md](docs/DESIGN.md) for the full design document.
+**Outbound:** Receive GitHub completion webhook → fetch results → post back to the originating tool (comments, status updates, thread replies)
 
-## Getting Started
+## Core Concepts
+
+- **Connectors** — Integrations with external tools (Linear, Slack, etc.). Each provides trigger and/or notification capabilities. Credentials defined once, shared across automations.
+- **Automations** — The unit of config that pairs one trigger with zero or more notifications. Each automation is independent.
+- **Runs** — A triggered workflow execution. Tracked in Postgres with status lifecycle: `triggered → queued → running → completed/failed`.
+- **Notifications** — Per-target result delivery. Each notification tracks its own status for retry handling.
+
+## Quick Start
 
 ### Prerequisites
 
-- Go 1.22+
-- Docker
-- [golangci-lint](https://golangci-lint.run/welcome/install/)
+- Node.js 20+
+- A Postgres database ([Neon](https://neon.tech), [Supabase](https://supabase.com), or Vercel Postgres)
+- A GitHub token with `actions:write` scope on your target repo
+- A target repo with a [claude-code-action](https://github.com/anthropics/claude-code-action) workflow
 
-### Build & Run
+### Local Development
 
 ```bash
-go build ./...          # compile everything
-go test ./...           # run tests
-golangci-lint run ./... # lint
+# Install dependencies
+npm install
+
+# Copy the example config and environment
+cp sidekick.example.yaml sidekick.yaml
+cp .env.example .env
+# Edit both files with your credentials
+
+# Run database migrations
+npm run db:migrate
+
+# Start the dev server
+npm run dev
 ```
+
+### Configuration
+
+Sidekick is configured via a `sidekick.yaml` file in the repo root. This file is committed to the repo — it contains no secrets, only `${VAR}` references that resolve against environment variables at startup.
+
+```yaml
+github:
+  token: ${GITHUB_TOKEN}
+  default_repo: "org/repo"
+  workflow: "claude-code-action.yml"
+
+connectors:
+  linear:
+    api_key: ${LINEAR_API_KEY}
+    webhook_secret: ${LINEAR_WEBHOOK_SECRET}
+
+automations:
+  - name: "linear-issues"
+    trigger:
+      connector: linear
+      on_label: "sidekick"
+      context:
+        include: [title, description, comments, labels]
+    notifications:
+      - connector: linear
+        comment: true
+        update_status: true
+        status_mapping:
+          pr_created: "In Review"
+          completed: "Done"
+          failed: "Triage"
+```
+
+Secrets live in environment variables — Vercel's dashboard for production, `.env` for local dev.
+
+### Deploy to Vercel
+
+The project is configured for Vercel out of the box. Connect the repo, set your environment variables, and deploy.
+
+## Tech Stack
+
+| Component | Choice |
+|---|---|
+| Language | TypeScript |
+| Web framework | [Hono](https://hono.dev) |
+| Deployment | [Vercel](https://vercel.com) (serverless) |
+| Database | Postgres + [Drizzle ORM](https://orm.drizzle.team) |
+| Configuration | YAML with `${VAR}` env interpolation |
+| Linting | [Biome](https://biomejs.dev) |
+| Testing | [Vitest](https://vitest.dev) |
+
+## Development
+
+```bash
+npm run build        # TypeScript compilation
+npm run typecheck    # Type checking without emit
+npm run lint         # Biome linter
+npm run lint:fix     # Biome linter with auto-fix
+npm test             # Run tests
+npm run dev          # Start dev server (hot reload)
+```
+
+## Project Wiki
+
+See [`wiki/`](wiki/) for detailed documentation on architecture, connectors, configuration, database schema, API routes, and more.
 
 ## License
 
-[Hippocratic License 3.0 (HL3)](LICENSE.md). See the license file for details.
+[Hippocratic License 3.0 (HL3)](LICENSE.md)
