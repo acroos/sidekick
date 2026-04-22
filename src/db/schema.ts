@@ -1,4 +1,11 @@
-import { jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+	integer,
+	jsonb,
+	pgTable,
+	text,
+	timestamp,
+	uuid,
+} from "drizzle-orm/pg-core";
 
 export const runs = pgTable("runs", {
 	id: uuid("id").primaryKey().defaultRandom(),
@@ -31,6 +38,8 @@ export const runNotifications = pgTable("run_notifications", {
 	config: jsonb("config"),
 	status: text("status").notNull().default("pending"),
 	error: text("error"),
+	retryCount: integer("retry_count").notNull().default(0),
+	maxRetries: integer("max_retries").notNull().default(3),
 	notifiedAt: timestamp("notified_at", { withTimezone: true }),
 	createdAt: timestamp("created_at", { withTimezone: true })
 		.notNull()

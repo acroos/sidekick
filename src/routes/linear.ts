@@ -5,6 +5,7 @@ import {
 	parseLabelEvent,
 	verifyLinearSignature,
 } from "../connectors/linear/webhook.js";
+import { logger } from "../middleware/logger.js";
 import type { AutomationService } from "../services/automations.js";
 
 interface LinearRoutesDeps {
@@ -54,6 +55,12 @@ export function createLinearRoutes(deps: LinearRoutesDeps) {
 		if (matchingAutomations.length === 0) {
 			return c.json({ ok: true, ignored: true });
 		}
+
+		logger.info("linear webhook: trigger matched", {
+			label: labelEvent.labelName,
+			issue_id: labelEvent.issueId,
+			automations: matchingAutomations.map((a) => a.name),
+		});
 
 		// Execute each matching automation
 		const runIds: string[] = [];
