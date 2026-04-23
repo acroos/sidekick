@@ -22,7 +22,7 @@ automations:
           - comments
           - labels
     prompt: |
-      Work on the ticket described above. Create a PR with your changes.
+      Work on the ticket described above.
       Ensure all existing tests pass and add new tests if needed.
     notifications:
       - connector: linear

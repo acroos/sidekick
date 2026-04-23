@@ -211,13 +211,74 @@ jobs:
         with:
           prompt: ${{ inputs.prompt }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          claude_args: '--allowedTools "Bash(git *),Bash(gh *),Bash(npm *),Read,Write,Edit,Glob,Grep"'
+          claude_args: '--allowedTools "Bash(npm *),Read,Write,Edit,Glob,Grep"'
+
+      - name: Create PR from Sidekick output
+        if: hashFiles('.sidekick-output.json') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          # Parse the output file
+          PR_TITLE=$(jq -r '.pr_title' .sidekick-output.json)
+          PR_DESCRIPTION=$(jq -r '.pr_description' .sidekick-output.json)
+          COMMIT_MESSAGE=$(jq -r '.commit_message' .sidekick-output.json)
+
+          # Validate required fields
+          if [ "$PR_TITLE" = "null" ] || [ -z "$PR_TITLE" ]; then
+            echo "::error::Missing pr_title in .sidekick-output.json"
+            exit 1
+          fi
+
+          # Read files_changed as a bash array
+          mapfile -t FILES < <(jq -r '.files_changed[]' .sidekick-output.json)
+          if [ ${#FILES[@]} -eq 0 ]; then
+            echo "No files listed in files_changed — skipping PR creation."
+            exit 0
+          fi
+
+          # Create branch
+          BRANCH="sidekick/${{ inputs.sidekick_run_id || github.run_id }}"
+          git checkout -b "$BRANCH"
+
+          # Stage only the specified files
+          for f in "${FILES[@]}"; do
+            if [ -e "$f" ]; then
+              git add "$f"
+            else
+              echo "::warning::File listed in files_changed does not exist: $f"
+            fi
+          done
+
+          # Remove the output file — don't include it in the PR
+          git checkout -- .sidekick-output.json 2>/dev/null || rm -f .sidekick-output.json
+
+          # Check if there are staged changes
+          if git diff --cached --quiet; then
+            echo "No staged changes — skipping PR creation."
+            exit 0
+          fi
+
+          # Commit and push
+          git config user.name "sidekick[bot]"
+          git config user.email "sidekick[bot]@users.noreply.github.com"
+          git commit -m "$COMMIT_MESSAGE"
+          git push origin "$BRANCH"
+
+          # Create the PR
+          gh pr create \
+            --title "$PR_TITLE" \
+            --body "$PR_DESCRIPTION" \
+            --base main \
+            --head "$BRANCH"
 ```
 
 Key settings:
 
 - **`id-token: write`** — Required for OIDC token exchange. The action uses this to obtain a GitHub app token for authentication.
-- **`claude_args` with `--allowedTools`** — Required for agent mode (`workflow_dispatch`). Without this, Claude runs successfully but gets permission denials when trying to create branches, push commits, or open PRs. The `Bash(git *)` and `Bash(gh *)` entries are what allow PR creation. Note: `--allowedTools` is a Claude Code CLI flag passed via `claude_args`, not a top-level action input.
+- **`claude_args` with `--allowedTools`** — Claude gets file editing tools (`Read`, `Write`, `Edit`, `Glob`, `Grep`) and `Bash(npm *)` for running tests/linters. It does **not** get `git` or `gh` — PR creation is handled by the deterministic "Create PR" step.
+- **"Create PR from Sidekick output" step** — Reads Claude's `.sidekick-output.json` output file, creates a branch, stages only the files Claude listed in `files_changed`, commits, pushes, and opens a PR. If Claude didn't produce an output file (no changes needed), the step is skipped via the `hashFiles` condition.
 
 You'll also need to add an `ANTHROPIC_API_KEY` secret to that repo (Settings > Secrets and variables > Actions > New repository secret).
 
@@ -431,8 +492,8 @@ YOUR_SIDEKICK_URL/api/runs
 
 ### Workflow completes but no PR is created
 
-- Check the action's result output for `permission_denials_count` — if this is greater than 0, Claude was blocked from performing actions. Add `--allowedTools` via `claude_args` in your workflow (see Step 5).
-- Enable `show_full_output: true` in the action's `with` block to see exactly which tools were denied.
+- Check whether Claude produced a `.sidekick-output.json` file. If not, Claude either couldn't solve the issue or didn't write output. Enable `show_full_output: true` in the action's `with` block to see Claude's full session.
+- If the file exists but the PR step failed, check the step logs — it may report missing fields or files that don't exist.
 - Ensure the `id-token: write` permission is set — without it, OIDC token exchange fails and git push won't authenticate.
 
 ### Workflow not dispatching

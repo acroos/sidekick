@@ -6,6 +6,27 @@ import type {
 import type { GitHubClient } from "../github/client.js";
 import type { RunService } from "./runs.js";
 
+const STRUCTURED_OUTPUT_INSTRUCTIONS = `
+
+---
+
+## Output
+
+Do NOT create branches, commits, or pull requests. Do NOT use git or gh CLI commands.
+Make your code changes directly, then write a \`.sidekick-output.json\` file to the repo root:
+
+\`\`\`json
+{
+  "pr_title": "Short PR title",
+  "pr_description": "Markdown description of changes",
+  "commit_message": "Conventional commit message",
+  "files_changed": ["path/to/file1.ts", "path/to/file2.ts"]
+}
+\`\`\`
+
+List every file you created or modified in \`files_changed\` using paths relative to the repo root.
+If you cannot make meaningful changes, do NOT write this file.`;
+
 export class AutomationService {
 	constructor(
 		private config: Config,
@@ -128,6 +149,8 @@ export class AutomationService {
 		if (prompt) {
 			parts.push(`\n---\n\n${prompt}`);
 		}
+
+		parts.push(STRUCTURED_OUTPUT_INSTRUCTIONS);
 
 		return parts.length > 0 ? parts.join("\n") : "No context available.";
 	}

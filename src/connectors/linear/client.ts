@@ -1,5 +1,17 @@
 import { LinearClient as LinearSDK } from "@linear/sdk";
 
+const SIDEKICK_COMMENT_PREFIXES = ["✅ **Sidekick run", "❌ **Sidekick run"];
+
+/**
+ * Filter out comments posted by Sidekick (status updates on prior runs).
+ */
+export function filterSidekickComments(comments: string[]): string[] {
+	return comments.filter(
+		(body) =>
+			!SIDEKICK_COMMENT_PREFIXES.some((prefix) => body.startsWith(prefix)),
+	);
+}
+
 export interface LinearIssueContext {
 	id: string;
 	identifier: string;
@@ -52,7 +64,9 @@ export class LinearClient {
 
 		if (fields.includes("comments")) {
 			const comments = await issue.comments();
-			context.comments = comments.nodes.map((c) => c.body);
+			context.comments = filterSidekickComments(
+				comments.nodes.map((c) => c.body),
+			);
 		}
 
 		if (fields.includes("linked_pull_requests")) {
