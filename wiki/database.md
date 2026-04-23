@@ -49,19 +49,22 @@ Schema is defined in `src/db/schema.ts` using Drizzle's `pgTable` builder. The d
 
 ### Migrations
 
-Drizzle Kit handles migrations:
+Migrations run automatically when Sidekick starts (via `src/db/migrate.ts`). This applies to both Docker and local development — no manual migration step is needed.
+
+For manual use or generating new migrations:
 
 ```bash
 npm run db:generate    # Generate migration from schema changes
-npm run db:migrate     # Apply pending migrations
+npm run db:migrate     # Apply pending migrations (via Drizzle Kit CLI)
 ```
 
 Migration files live in the `drizzle/` directory. The config is in `drizzle.config.ts`.
 
-## Managed Postgres Options
+## Postgres Options
 
-Any Postgres provider works. Common choices for Vercel deployments:
+Any Postgres provider works.
 
-- [Neon](https://neon.tech) — Serverless Postgres, generous free tier
+- **Docker Compose** (included) — `docker compose up` provisions Postgres automatically. Best for self-hosting and local development.
+- [Neon](https://neon.tech) — Serverless Postgres, generous free tier. Good for Vercel deployments.
 - [Supabase](https://supabase.com) — Managed Postgres with extras
 - [Vercel Postgres](https://vercel.com/docs/storage/vercel-postgres) — Tight Vercel integration (powered by Neon)

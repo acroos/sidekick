@@ -22,7 +22,7 @@ You will need:
 - **Node.js 24** (specified in `.node-version`; 20+ will work)
 - **A GitHub account** with a repo you want Claude Code to work on
 - **A Linear account** (the only connector currently supported)
-- **One of:** a [Vercel](https://vercel.com) account or a [Railway](https://railway.com) account for deployment
+- **One of:** [Docker](https://docs.docker.com/get-docker/), a [Vercel](https://vercel.com) account, or a [Railway](https://railway.com) account for deployment
 
 ## Step 1: Clone the repo
 
@@ -36,11 +36,15 @@ npm install
 
 Sidekick stores run state in Postgres. You need a database before anything else.
 
-### Option A: Railway Postgres (if deploying to Railway)
+### Option A: Docker Compose (recommended)
+
+If you're deploying with Docker (see [Step 7C](#step-7c-deploy-with-docker)), skip this step — Docker Compose provisions Postgres for you automatically.
+
+### Option B: Railway Postgres (if deploying to Railway)
 
 Railway can provision a Postgres database as part of your project. Skip this step for now — you'll create it during Railway deployment in [Step 7B](#step-7b-deploy-to-railway).
 
-### Option B: Neon (recommended for Vercel)
+### Option C: Neon (recommended for Vercel)
 
 1. Create a free account at [neon.tech](https://neon.tech)
 2. Create a new project
@@ -49,14 +53,14 @@ Railway can provision a Postgres database as part of your project. Skip this ste
    postgresql://user:password@ep-something.us-east-2.aws.neon.tech/neondb?sslmode=require
    ```
 
-### Option C: Supabase
+### Option D: Supabase
 
 1. Create a free account at [supabase.com](https://supabase.com)
 2. Create a new project
 3. Go to Settings > Database > Connection string > URI
 4. Copy the connection string
 
-### Option D: Local Postgres (for development only)
+### Option E: Local Postgres (for development only)
 
 If you have Postgres installed locally:
 
@@ -223,16 +227,17 @@ You'll also need to add an `ANTHROPIC_API_KEY` secret to that repo (Settings > S
 
 The workflow filename must match the `github.workflow` value in your `sidekick.yaml` (default: `claude-code-action.yml`).
 
-## Step 6: Run database migrations
+## Step 6: Database migrations
 
-Before starting Sidekick for the first time, create the database tables:
+Migrations run automatically when Sidekick starts — no manual step needed. On first startup, Sidekick creates the `runs` and `run_notifications` tables.
+
+If you need to run migrations manually (e.g., against a remote database before deploying to Vercel):
 
 ```bash
-npm run db:generate
 npm run db:migrate
 ```
 
-If you're using a remote database, make sure `DATABASE_URL` is set in your environment (or in your `.env` file) before running this.
+Make sure `DATABASE_URL` is set in your environment (or in your `.env` file) before running this.
 
 ## Step 7: Deploy
 
@@ -335,21 +340,9 @@ In your Sidekick service, go to **Settings**:
 
 Alternatively, Railway auto-detects these from `package.json` in most cases.
 
-#### 6. Run database migrations
+#### 6. Database migrations
 
-Railway doesn't run migrations automatically. You can either:
-
-**Option A: Add a deploy command** — In Settings, set a **Deploy Command** (runs after build, before start):
-
-```bash
-npm run db:migrate
-```
-
-**Option B: Run manually** — Use the Railway CLI:
-
-```bash
-railway run npm run db:migrate
-```
+Migrations run automatically when Sidekick starts — no manual step needed. On first deploy, Sidekick creates the necessary tables.
 
 #### 7. Get your public URL
 
@@ -360,6 +353,63 @@ Verify the deployment:
 
 ```
 https://your-app.up.railway.app/api/health
+```
+
+---
+
+### Step 7C: Deploy with Docker
+
+Docker Compose bundles Sidekick and Postgres together. This works on any machine with Docker installed — your own server, a VPS, etc.
+
+#### 1. Configure
+
+If you haven't already, copy and fill in the config files:
+
+```bash
+cp sidekick.example.yaml sidekick.yaml    # Edit default_repo, workflow, etc.
+cp .env.example .env                       # Fill in tokens and secrets
+```
+
+When using Docker Compose, you can leave `DATABASE_URL` as-is in `.env` — the compose file overrides it with the bundled Postgres connection string.
+
+#### 2. Start
+
+```bash
+docker compose up -d
+```
+
+This starts Postgres, waits for it to be healthy, then starts Sidekick. Migrations run automatically on startup.
+
+Verify the deployment:
+
+```
+http://localhost:3000/api/health
+```
+
+#### 3. Run the Docker image standalone
+
+If you already have a Postgres database and just want to run Sidekick:
+
+```bash
+docker build -t sidekick .
+
+docker run -p 3000:3000 \
+  -e DATABASE_URL="postgresql://user:pass@host:5432/sidekick" \
+  -e GITHUB_TOKEN="ghp_..." \
+  -e GITHUB_WEBHOOK_SECRET="..." \
+  -e LINEAR_API_KEY="lin_api_..." \
+  -e LINEAR_WEBHOOK_SECRET="..." \
+  -v ./sidekick.yaml:/app/sidekick.yaml:ro \
+  sidekick
+```
+
+#### 4. Expose to the internet
+
+Sidekick needs a public URL for webhooks. If you're running on a server with a public IP, point your domain at it. For local or private deployments, use a tunnel:
+
+```bash
+ngrok http 3000
+# Use the ngrok URL when configuring webhooks in Step 8
 ```
 
 ---
