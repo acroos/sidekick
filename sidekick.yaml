@@ -7,6 +7,8 @@ connectors:
   linear:
     api_key: ${LINEAR_API_KEY}
     webhook_secret: ${LINEAR_WEBHOOK_SECRET}
+  github:
+    webhook_secret: ${GITHUB_WEBHOOK_SECRET}
 
 automations:
   - name: "linear-issues"
