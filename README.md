@@ -107,9 +107,7 @@ Secrets live in environment variables — Vercel's dashboard for production, `.e
 
 ### Deploy
 
-**Docker:** Run the image anywhere containers run — your own server, Fly.io, Railway, etc. Set environment variables and mount your `sidekick.yaml`.
-
-**Vercel:** The project is also configured for Vercel out of the box. Connect the repo, set your environment variables, and deploy.
+See the [setup guide](docs/setup-guide.md) for full deployment instructions (Docker, Vercel, Railway).
 
 ## Tech Stack
 
