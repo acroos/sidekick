@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
 	type LinearWebhookPayload,
 	matchesTrigger,
+	parseLabelAppliedEvent,
 	parseLabelEvent,
 	verifyLinearSignature,
 } from "../webhook.js";
@@ -117,6 +118,109 @@ describe("parseLabelEvent", () => {
 		};
 
 		expect(parseLabelEvent(payload)).toBeNull();
+	});
+});
+
+describe("parseLabelAppliedEvent", () => {
+	it("parses an IssueLabel update event with lastAppliedAt change", () => {
+		const payload: LinearWebhookPayload = {
+			action: "update",
+			type: "IssueLabel",
+			data: {
+				id: "label-456",
+				name: "sidekick",
+				color: "#blue",
+				isGroup: false,
+				lastAppliedAt: "2026-04-22T01:00:00Z",
+			},
+			url: "https://linear.app/team/settings/labels",
+			createdAt: "2026-04-22T01:00:00Z",
+			updatedFrom: {
+				lastAppliedAt: "2026-04-21T00:00:00Z",
+			},
+		};
+
+		const event = parseLabelAppliedEvent(payload);
+		expect(event).not.toBeNull();
+		expect(event?.labelName).toBe("sidekick");
+		expect(event?.labelId).toBe("label-456");
+	});
+
+	it("returns null for non-IssueLabel types", () => {
+		const payload: LinearWebhookPayload = {
+			action: "update",
+			type: "Issue",
+			data: { id: "issue-123", name: "some issue" },
+			url: "https://linear.app/team/issue/ENG-123",
+			createdAt: "2026-04-22T00:00:00Z",
+		};
+
+		expect(parseLabelAppliedEvent(payload)).toBeNull();
+	});
+
+	it("returns null for create action", () => {
+		const payload: LinearWebhookPayload = {
+			action: "create",
+			type: "IssueLabel",
+			data: {
+				id: "label-456",
+				name: "sidekick",
+				issueId: "issue-123",
+				labelId: "label-456",
+			},
+			url: "https://linear.app/team/issue/ENG-123",
+			createdAt: "2026-04-22T00:00:00Z",
+		};
+
+		expect(parseLabelAppliedEvent(payload)).toBeNull();
+	});
+
+	it("returns null when label name is missing", () => {
+		const payload: LinearWebhookPayload = {
+			action: "update",
+			type: "IssueLabel",
+			data: { id: "label-456", color: "#blue" },
+			url: "https://linear.app/team/settings/labels",
+			createdAt: "2026-04-22T00:00:00Z",
+			updatedFrom: { lastAppliedAt: "2026-04-21T00:00:00Z" },
+		};
+
+		expect(parseLabelAppliedEvent(payload)).toBeNull();
+	});
+
+	it("returns null when updatedFrom has no lastAppliedAt (e.g. color change)", () => {
+		const payload: LinearWebhookPayload = {
+			action: "update",
+			type: "IssueLabel",
+			data: {
+				id: "label-456",
+				name: "sidekick",
+				color: "#red",
+			},
+			url: "https://linear.app/team/settings/labels",
+			createdAt: "2026-04-22T00:00:00Z",
+			updatedFrom: { color: "#blue" },
+		};
+
+		expect(parseLabelAppliedEvent(payload)).toBeNull();
+	});
+
+	it("parses event when updatedFrom is absent", () => {
+		const payload: LinearWebhookPayload = {
+			action: "update",
+			type: "IssueLabel",
+			data: {
+				id: "label-456",
+				name: "sidekick",
+				lastAppliedAt: "2026-04-22T01:00:00Z",
+			},
+			url: "https://linear.app/team/settings/labels",
+			createdAt: "2026-04-22T01:00:00Z",
+		};
+
+		const event = parseLabelAppliedEvent(payload);
+		expect(event).not.toBeNull();
+		expect(event?.labelName).toBe("sidekick");
 	});
 });
 

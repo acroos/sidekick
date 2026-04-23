@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import type { LinearClient } from "./connectors/linear/client.js";
 import type { GitHubClient } from "./github/client.js";
 import { errorHandler } from "./middleware/error-handler.js";
 import { requestLogger } from "./middleware/logger.js";
@@ -17,6 +18,7 @@ export interface AppDeps {
 	automationService: AutomationService;
 	notificationService: NotificationService;
 	linearWebhookSecret: string;
+	linearClient: LinearClient | null;
 }
 
 /**
@@ -44,6 +46,7 @@ export function createApp(deps: AppDeps) {
 		createLinearRoutes({
 			automationService: deps.automationService,
 			webhookSecret: deps.linearWebhookSecret,
+			linearClient: deps.linearClient,
 		}),
 	);
 	app.route(

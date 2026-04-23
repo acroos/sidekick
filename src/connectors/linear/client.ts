@@ -66,6 +66,24 @@ export class LinearClient {
 	}
 
 	/**
+	 * Find the most recently updated issue with a given label.
+	 * Used when a webhook tells us a label was applied but doesn't include the issue ID.
+	 */
+	async findRecentlyLabeledIssue(
+		labelId: string,
+	): Promise<{ id: string; url: string } | null> {
+		const label = await this.sdk.issueLabel(labelId);
+		const issues = await label.issues({ first: 1 });
+
+		if (issues.nodes.length === 0) {
+			return null;
+		}
+
+		const issue = issues.nodes[0];
+		return { id: issue.id, url: issue.url };
+	}
+
+	/**
 	 * Post a comment on a Linear issue.
 	 */
 	async postComment(issueId: string, body: string): Promise<void> {
