@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, gt } from "drizzle-orm";
 import type { Notification } from "../config/schema.js";
 import type { Database } from "../db/client.js";
 import { runNotifications, runs } from "../db/schema.js";
@@ -25,6 +25,28 @@ export function isValidTransition(from: RunStatus, to: RunStatus): boolean {
 
 export class RunService {
 	constructor(private db: Database) {}
+
+	/**
+	 * Check if a run was already created for the same automation + trigger
+	 * within a recent time window. Prevents duplicates from webhook retries
+	 * or multiple event shapes for the same user action.
+	 */
+	async findRecentRun(
+		automation: string,
+		triggerId: string,
+		windowMs = 5 * 60 * 1000,
+	) {
+		const cutoff = new Date(Date.now() - windowMs);
+		return (
+			(await this.db.query.runs.findFirst({
+				where: and(
+					eq(runs.automation, automation),
+					eq(runs.triggerId, triggerId),
+					gt(runs.createdAt, cutoff),
+				),
+			})) ?? null
+		);
+	}
 
 	/**
 	 * Create a new run and its associated notification records.

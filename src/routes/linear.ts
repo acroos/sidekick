@@ -130,7 +130,14 @@ export function createLinearRoutes(deps: LinearRoutesDeps) {
 				issueId,
 				issueUrl,
 			});
-			runIds.push(runId);
+			if (runId) {
+				runIds.push(runId);
+			} else {
+				logger.info("linear webhook: skipped duplicate run", {
+					automation: automation.name,
+					issue_id: issueId,
+				});
+			}
 		}
 
 		return c.json({ ok: true, runs: runIds });

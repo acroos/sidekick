@@ -157,6 +157,32 @@ describe("POST /api/webhooks/linear", () => {
 		});
 	});
 
+	it("filters out duplicate runs from response", async () => {
+		const automation = {
+			name: "linear-issues",
+			trigger: { connector: "linear", on_label: "sidekick" },
+			notifications: [],
+		};
+		const findLinearLabelAutomations = vi.fn().mockReturnValue([automation]);
+		const executeLinearTrigger = vi.fn().mockResolvedValue(null);
+
+		const { app } = makeApp({
+			findLinearLabelAutomations,
+			executeLinearTrigger,
+		});
+		const body = JSON.stringify(labelPayload("create", "sidekick"));
+
+		const res = await app.request("/api/webhooks/linear", {
+			method: "POST",
+			body,
+			headers: { "linear-signature": sign(body, webhookSecret) },
+		});
+
+		expect(res.status).toBe(200);
+		const json = (await res.json()) as { ok: boolean; runs: string[] };
+		expect(json.runs).toEqual([]);
+	});
+
 	it("does not execute on label remove", async () => {
 		const automation = {
 			name: "linear-issues",

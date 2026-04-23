@@ -32,6 +32,7 @@ const baseConfig: Config = {
 
 function makeDeps() {
 	const mockRunService = {
+		findRecentRun: vi.fn().mockResolvedValue(null),
 		createRun: vi.fn().mockResolvedValue({ id: "run-1" }),
 		setGitHubRunId: vi.fn(),
 	};
@@ -215,5 +216,20 @@ describe("AutomationService.executeLinearTrigger", () => {
 		});
 
 		expect(mockRunService.setGitHubRunId).not.toHaveBeenCalled();
+	});
+
+	it("skips duplicate run for same automation + issue", async () => {
+		const { service, mockRunService, mockGithubClient } = makeDeps();
+		mockRunService.findRecentRun.mockResolvedValue({ id: "existing-run" });
+
+		const result = await service.executeLinearTrigger({
+			automation: baseConfig.automations[0],
+			issueId: "issue-123",
+			issueUrl: "https://linear.app/team/issue/ENG-123",
+		});
+
+		expect(result).toBeNull();
+		expect(mockRunService.createRun).not.toHaveBeenCalled();
+		expect(mockGithubClient.dispatchWorkflow).not.toHaveBeenCalled();
 	});
 });

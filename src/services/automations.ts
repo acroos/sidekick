@@ -33,8 +33,17 @@ export class AutomationService {
 		automation: Automation;
 		issueId: string;
 		issueUrl: string;
-	}): Promise<string> {
+	}): Promise<string | null> {
 		const { automation, issueId, issueUrl } = params;
+
+		// Skip if a run for this automation + issue already exists (dedup)
+		const existing = await this.runService.findRecentRun(
+			automation.name,
+			issueId,
+		);
+		if (existing) {
+			return null;
+		}
 
 		// Extract context from the Linear issue
 		let context: LinearIssueContext | null = null;
