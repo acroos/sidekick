@@ -31,12 +31,28 @@ export function createLinearRoutes(deps: LinearRoutesDeps) {
 		}
 
 		const payload = JSON.parse(body) as LinearWebhookPayload;
+
+		logger.info("linear webhook: received", {
+			type: payload.type,
+			action: payload.action,
+			data_keys: Object.keys(payload.data ?? {}),
+		});
+
 		const labelEvent = parseLabelEvent(payload);
 
 		if (!labelEvent) {
-			// Not a label event we care about
+			logger.info("linear webhook: ignored (not a label event)", {
+				type: payload.type,
+				action: payload.action,
+			});
 			return c.json({ ok: true, ignored: true });
 		}
+
+		logger.info("linear webhook: parsed label event", {
+			action: labelEvent.action,
+			label_name: labelEvent.labelName,
+			issue_id: labelEvent.issueId,
+		});
 
 		// Find automations that match this label trigger
 		const automations = deps.automationService.findLinearLabelAutomations(
@@ -44,6 +60,9 @@ export function createLinearRoutes(deps: LinearRoutesDeps) {
 		);
 
 		if (automations.length === 0) {
+			logger.info("linear webhook: ignored (no matching automations)", {
+				label_name: labelEvent.labelName,
+			});
 			return c.json({ ok: true, ignored: true });
 		}
 
@@ -53,6 +72,10 @@ export function createLinearRoutes(deps: LinearRoutesDeps) {
 		);
 
 		if (matchingAutomations.length === 0) {
+			logger.info("linear webhook: ignored (trigger filter rejected)", {
+				action: labelEvent.action,
+				label_name: labelEvent.labelName,
+			});
 			return c.json({ ok: true, ignored: true });
 		}
 
