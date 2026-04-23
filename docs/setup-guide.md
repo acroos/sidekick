@@ -211,7 +211,7 @@ jobs:
         with:
           prompt: ${{ inputs.prompt }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          claude_args: '--allowedTools "Bash(npm *),Read,Write,Edit,Glob,Grep"'
+          claude_args: '--allowedTools "Bash,Read,Write,Edit,Glob,Grep"'
 
       - name: Create PR from Sidekick output
         if: hashFiles('.sidekick-output.json') != ''
@@ -277,8 +277,22 @@ jobs:
 Key settings:
 
 - **`id-token: write`** — Required for OIDC token exchange. The action uses this to obtain a GitHub app token for authentication.
-- **`claude_args` with `--allowedTools`** — Claude gets file editing tools (`Read`, `Write`, `Edit`, `Glob`, `Grep`) and `Bash(npm *)` for running tests/linters. It does **not** get `git` or `gh` — PR creation is handled by the deterministic "Create PR" step.
+- **`claude_args` with `--allowedTools`** — Claude gets file editing tools (`Read`, `Write`, `Edit`, `Glob`, `Grep`) and unrestricted `Bash` for running tests, linters, and build commands. It does **not** get `git` or `gh` — PR creation is handled by the deterministic "Create PR" step. You can restrict `Bash` to specific commands if you prefer (see examples below).
 - **"Create PR from Sidekick output" step** — Reads Claude's `.sidekick-output.json` output file, creates a branch, stages only the files Claude listed in `files_changed`, commits, pushes, and opens a PR. If Claude didn't produce an output file (no changes needed), the step is skipped via the `hashFiles` condition.
+
+#### Customizing allowed tools
+
+The `Bash` permission in the example above is unrestricted — Claude can run any shell command except `git` and `gh` (which aren't installed or are excluded by Sidekick's prompt instructions). If you want to lock down Bash to specific commands, use `Bash(pattern)` entries:
+
+| Project type | `claude_args` example |
+|---|---|
+| Node.js / TypeScript | `'--allowedTools "Bash(npm *),Bash(npx *),Read,Write,Edit,Glob,Grep"'` |
+| Ruby / Rails | `'--allowedTools "Bash(bundle *),Bash(rails *),Bash(rake *),Read,Write,Edit,Glob,Grep"'` |
+| Go | `'--allowedTools "Bash(go *),Bash(make *),Read,Write,Edit,Glob,Grep"'` |
+| Next.js + Rails + Go (monorepo) | `'--allowedTools "Bash(npm *),Bash(npx *),Bash(bundle *),Bash(rails *),Bash(rake *),Bash(go *),Bash(make *),Read,Write,Edit,Glob,Grep"'` |
+| Any project (permissive) | `'--allowedTools "Bash,Read,Write,Edit,Glob,Grep"'` |
+
+The permissive `Bash` (no pattern) is the simplest option and works for any project type. Use specific patterns when you want to limit what Claude can execute.
 
 You'll also need to add an `ANTHROPIC_API_KEY` secret to that repo (Settings > Secrets and variables > Actions > New repository secret).
 
