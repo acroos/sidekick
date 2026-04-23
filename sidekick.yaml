@@ -1,9 +1,6 @@
-# Sidekick configuration — copy to sidekick.yaml and fill in.
-# Secrets use ${VAR} syntax and resolve from environment variables.
-
 github:
   token: ${GITHUB_TOKEN}
-  default_repo: "org/repo"
+  default_repo: "acroos/ax"
   workflow: "claude-code-action.yml"
 
 connectors:
@@ -22,6 +19,9 @@ automations:
           - description
           - comments
           - labels
+      prompt: |
+        Work on the ticket described above. Create a PR with your changes.
+        Ensure all existing tests pass and add new tests if needed.
     notifications:
       - connector: linear
         comment: true
