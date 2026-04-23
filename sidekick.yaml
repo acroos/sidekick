@@ -1,0 +1,32 @@
+github:
+  token: ${GITHUB_TOKEN}
+  default_repo: "acroos/ax"
+  workflow: "claude-code-action.yml"
+
+connectors:
+  linear:
+    api_key: ${LINEAR_API_KEY}
+    webhook_secret: ${LINEAR_WEBHOOK_SECRET}
+
+automations:
+  - name: "linear-issues"
+    trigger:
+      connector: linear
+      on_label: "sidekick"
+      context:
+        include:
+          - title
+          - description
+          - comments
+          - labels
+      prompt: |
+        Work on the ticket described above. Create a PR with your changes.
+        Ensure all existing tests pass and add new tests if needed.
+    notifications:
+      - connector: linear
+        comment: true
+        update_status: true
+        status_mapping:
+          pr_created: "In Review"
+          completed: "Done"
+          failed: "Triage"
