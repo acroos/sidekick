@@ -211,13 +211,13 @@ jobs:
         with:
           prompt: ${{ inputs.prompt }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          allowed_tools: "Bash(git *),Bash(gh *),Bash(npm *),Read,Write,Edit,Glob,Grep"
+          claude_args: '--allowedTools "Bash(git *),Bash(gh *),Bash(npm *),Read,Write,Edit,Glob,Grep"'
 ```
 
 Key settings:
 
 - **`id-token: write`** — Required for OIDC token exchange. The action uses this to obtain a GitHub app token for authentication.
-- **`allowed_tools`** — Required for agent mode (`workflow_dispatch`). Without this, Claude runs successfully but gets permission denials when trying to create branches, push commits, or open PRs. The `Bash(git *)` and `Bash(gh *)` entries are what allow PR creation.
+- **`claude_args` with `--allowedTools`** — Required for agent mode (`workflow_dispatch`). Without this, Claude runs successfully but gets permission denials when trying to create branches, push commits, or open PRs. The `Bash(git *)` and `Bash(gh *)` entries are what allow PR creation. Note: `--allowedTools` is a Claude Code CLI flag passed via `claude_args`, not a top-level action input.
 
 You'll also need to add an `ANTHROPIC_API_KEY` secret to that repo (Settings > Secrets and variables > Actions > New repository secret).
 
@@ -431,7 +431,7 @@ YOUR_SIDEKICK_URL/api/runs
 
 ### Workflow completes but no PR is created
 
-- Check the action's result output for `permission_denials_count` — if this is greater than 0, Claude was blocked from performing actions. Add `allowed_tools` to your workflow (see Step 5).
+- Check the action's result output for `permission_denials_count` — if this is greater than 0, Claude was blocked from performing actions. Add `--allowedTools` via `claude_args` in your workflow (see Step 5).
 - Enable `show_full_output: true` in the action's `with` block to see exactly which tools were denied.
 - Ensure the `id-token: write` permission is set — without it, OIDC token exchange fails and git push won't authenticate.
 
