@@ -17,6 +17,16 @@ export interface LinearLabelEvent {
 }
 
 /**
+ * Event fired when a label is applied to an issue.
+ * Linear sends this as an IssueLabel "update" with the label definition data
+ * (no issueId — requires a follow-up API call to find the issue).
+ */
+export interface LinearLabelAppliedEvent {
+	labelName: string;
+	labelId: string;
+}
+
+/**
  * Verify a Linear webhook signature using HMAC-SHA256.
  * Linear sends the signature in the `Linear-Signature` header as a hex digest.
  */
@@ -72,6 +82,34 @@ export function parseLabelEvent(
 		labelName,
 		labelId,
 	};
+}
+
+/**
+ * Parse an IssueLabel "update" event, which fires when a label is applied to an issue.
+ * Linear sends the label definition data (name, color, etc.) but no issueId.
+ * Returns null if the event is not a label application.
+ */
+export function parseLabelAppliedEvent(
+	payload: LinearWebhookPayload,
+): LinearLabelAppliedEvent | null {
+	if (payload.type !== "IssueLabel" || payload.action !== "update") {
+		return null;
+	}
+
+	const data = payload.data;
+	const labelName = data.name as string | undefined;
+	const labelId = data.id as string | undefined;
+
+	if (!labelName || !labelId) {
+		return null;
+	}
+
+	// Only trigger when lastAppliedAt changed (label was applied, not just renamed/recolored)
+	if (payload.updatedFrom && !("lastAppliedAt" in payload.updatedFrom)) {
+		return null;
+	}
+
+	return { labelName, labelId };
 }
 
 /**

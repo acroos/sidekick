@@ -40,6 +40,7 @@ const app = createApp({
 	automationService,
 	notificationService,
 	linearWebhookSecret,
+	linearClient,
 });
 
 serve({ fetch: app.fetch, port }, (info) => {

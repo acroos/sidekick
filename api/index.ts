@@ -28,6 +28,7 @@ const app = createApp({
 	automationService,
 	notificationService,
 	linearWebhookSecret,
+	linearClient,
 });
 
 export default handle(app);
