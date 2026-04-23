@@ -189,7 +189,7 @@ describe("AutomationService.executeLinearTrigger", () => {
 		);
 	});
 
-	it("dispatches without prompt section when prompt is not configured", async () => {
+	it("dispatches without custom prompt section when prompt is not configured", async () => {
 		const { service, mockGithubClient } = makeDeps();
 
 		const automation = baseConfig.automations[1]; // linear-bugs — no prompt
@@ -201,8 +201,52 @@ describe("AutomationService.executeLinearTrigger", () => {
 		});
 
 		const dispatchCall = mockGithubClient.dispatchWorkflow.mock.calls[0][0];
-		expect(dispatchCall.inputs.prompt).toContain("ENG-123: Fix the bug");
-		expect(dispatchCall.inputs.prompt).not.toContain("---");
+		const prompt: string = dispatchCall.inputs.prompt;
+		expect(prompt).toContain("ENG-123: Fix the bug");
+		// No custom prompt separator — the only --- should be from output instructions
+		const outputStart = prompt.indexOf(".sidekick-output.json");
+		expect(outputStart).toBeGreaterThan(0);
+		const beforeOutput = prompt.slice(0, outputStart);
+		// The context section has no --- separators (no comments, no custom prompt)
+		expect(beforeOutput).not.toContain("Fix this issue");
+	});
+
+	it("always includes structured output instructions", async () => {
+		const { service, mockGithubClient } = makeDeps();
+
+		await service.executeLinearTrigger({
+			automation: baseConfig.automations[0],
+			issueId: "issue-123",
+			issueUrl: "https://linear.app/team/issue/ENG-123",
+		});
+
+		const prompt =
+			mockGithubClient.dispatchWorkflow.mock.calls[0][0].inputs.prompt;
+		expect(prompt).toContain(".sidekick-output.json");
+		expect(prompt).toContain("files_changed");
+		expect(prompt).toContain("Do NOT create branches");
+	});
+
+	it("places output instructions after custom prompt", async () => {
+		const { service, mockGithubClient } = makeDeps();
+
+		const automation = {
+			...baseConfig.automations[0],
+			prompt: "Fix the tooltip issue.",
+		};
+
+		await service.executeLinearTrigger({
+			automation,
+			issueId: "issue-123",
+			issueUrl: "https://linear.app/team/issue/ENG-123",
+		});
+
+		const prompt =
+			mockGithubClient.dispatchWorkflow.mock.calls[0][0].inputs.prompt;
+		const customPromptIdx = prompt.indexOf("Fix the tooltip issue.");
+		const outputIdx = prompt.indexOf(".sidekick-output.json");
+		expect(customPromptIdx).toBeGreaterThan(0);
+		expect(outputIdx).toBeGreaterThan(customPromptIdx);
 	});
 
 	it("handles null GitHub run ID gracefully", async () => {
