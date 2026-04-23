@@ -1,4 +1,4 @@
-CREATE TABLE "run_notifications" (
+CREATE TABLE IF NOT EXISTS "run_notifications" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"run_id" uuid NOT NULL,
 	"connector" text NOT NULL,
@@ -13,7 +13,7 @@ CREATE TABLE "run_notifications" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "runs" (
+CREATE TABLE IF NOT EXISTS "runs" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"automation" text NOT NULL,
 	"trigger_type" text NOT NULL,
@@ -29,4 +29,7 @@ CREATE TABLE "runs" (
 	"completed_at" timestamp with time zone
 );
 --> statement-breakpoint
-ALTER TABLE "run_notifications" ADD CONSTRAINT "run_notifications_run_id_runs_id_fk" FOREIGN KEY ("run_id") REFERENCES "public"."runs"("id") ON DELETE no action ON UPDATE no action;
+DO $$ BEGIN
+  ALTER TABLE "run_notifications" ADD CONSTRAINT "run_notifications_run_id_runs_id_fk" FOREIGN KEY ("run_id") REFERENCES "public"."runs"("id") ON DELETE no action ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
