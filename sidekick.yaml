@@ -17,11 +17,9 @@ automations:
         include:
           - title
           - description
-          - comments
-          - labels
-      prompt: |
-        Work on the ticket described above. Create a PR with your changes.
-        Ensure all existing tests pass and add new tests if needed.
+    prompt: |
+      Work on the ticket described above. Create a PR with your changes.
+      Ensure all existing tests pass and add new tests if needed.
     notifications:
       - connector: linear
         comment: true
