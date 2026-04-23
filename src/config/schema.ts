@@ -33,6 +33,7 @@ const notificationSchema = z.object({
 const automationSchema = z.object({
 	name: z.string(),
 	trigger: triggerSchema,
+	prompt: z.string().optional(),
 	notifications: z.array(notificationSchema).default([]),
 	repo: z.string().optional(),
 });

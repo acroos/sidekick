@@ -167,6 +167,43 @@ describe("AutomationService.executeLinearTrigger", () => {
 		);
 	});
 
+	it("includes automation prompt in dispatched workflow", async () => {
+		const { service, mockGithubClient } = makeDeps();
+
+		const automation = {
+			...baseConfig.automations[0],
+			prompt: "Fix this issue and create a PR.",
+		};
+
+		await service.executeLinearTrigger({
+			automation,
+			issueId: "issue-123",
+			issueUrl: "https://linear.app/team/issue/ENG-123",
+		});
+
+		const dispatchCall = mockGithubClient.dispatchWorkflow.mock.calls[0][0];
+		expect(dispatchCall.inputs.prompt).toContain("ENG-123: Fix the bug");
+		expect(dispatchCall.inputs.prompt).toContain(
+			"Fix this issue and create a PR.",
+		);
+	});
+
+	it("dispatches without prompt section when prompt is not configured", async () => {
+		const { service, mockGithubClient } = makeDeps();
+
+		const automation = baseConfig.automations[1]; // linear-bugs — no prompt
+
+		await service.executeLinearTrigger({
+			automation,
+			issueId: "issue-123",
+			issueUrl: "https://linear.app/team/issue/ENG-123",
+		});
+
+		const dispatchCall = mockGithubClient.dispatchWorkflow.mock.calls[0][0];
+		expect(dispatchCall.inputs.prompt).toContain("ENG-123: Fix the bug");
+		expect(dispatchCall.inputs.prompt).not.toContain("---");
+	});
+
 	it("handles null GitHub run ID gracefully", async () => {
 		const { service, mockGithubClient, mockRunService } = makeDeps();
 		mockGithubClient.dispatchWorkflow.mockResolvedValue({ runId: null });

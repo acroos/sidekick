@@ -69,7 +69,7 @@ export class AutomationService {
 		});
 
 		// Dispatch the GitHub Actions workflow
-		const prompt = this.buildPrompt(context);
+		const prompt = this.buildPrompt(context, automation.prompt);
 		const dispatchResult = await this.githubClient.dispatchWorkflow({
 			repo,
 			workflow,
@@ -93,36 +93,42 @@ export class AutomationService {
 	/**
 	 * Build a prompt from the extracted context to pass to claude-code-action.
 	 */
-	private buildPrompt(context: LinearIssueContext | null): string {
-		if (!context) {
-			return "No context available.";
-		}
-
+	private buildPrompt(
+		context: LinearIssueContext | null,
+		prompt?: string,
+	): string {
 		const parts: string[] = [];
-		parts.push(`# ${context.identifier}: ${context.title}`);
 
-		if (context.description) {
-			parts.push(`\n## Description\n${context.description}`);
-		}
+		if (context) {
+			parts.push(`# ${context.identifier}: ${context.title}`);
 
-		if (context.labels.length > 0) {
-			parts.push(`\n**Labels:** ${context.labels.join(", ")}`);
-		}
+			if (context.description) {
+				parts.push(`\n## Description\n${context.description}`);
+			}
 
-		if (context.comments.length > 0) {
-			parts.push("\n## Comments");
-			for (const comment of context.comments) {
-				parts.push(`\n---\n${comment}`);
+			if (context.labels.length > 0) {
+				parts.push(`\n**Labels:** ${context.labels.join(", ")}`);
+			}
+
+			if (context.comments.length > 0) {
+				parts.push("\n## Comments");
+				for (const comment of context.comments) {
+					parts.push(`\n---\n${comment}`);
+				}
+			}
+
+			if (context.linkedPullRequests.length > 0) {
+				parts.push("\n## Linked Pull Requests");
+				for (const pr of context.linkedPullRequests) {
+					parts.push(`- ${pr.title ?? pr.url}`);
+				}
 			}
 		}
 
-		if (context.linkedPullRequests.length > 0) {
-			parts.push("\n## Linked Pull Requests");
-			for (const pr of context.linkedPullRequests) {
-				parts.push(`- ${pr.title ?? pr.url}`);
-			}
+		if (prompt) {
+			parts.push(`\n---\n\n${prompt}`);
 		}
 
-		return parts.join("\n");
+		return parts.length > 0 ? parts.join("\n") : "No context available.";
 	}
 }

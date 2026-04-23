@@ -22,6 +22,9 @@ automations:
           - description
           - comments
           - labels
+    prompt: |
+      Fix the issue described above. Create a PR with your changes.
+      Ensure all existing tests pass and add new tests if needed.
     notifications:
       - connector: linear
         comment: true
