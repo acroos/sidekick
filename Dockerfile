@@ -21,6 +21,7 @@ RUN npm ci --omit=dev
 
 COPY --from=build /app/dist/ dist/
 COPY drizzle/ drizzle/
+COPY sidekick.yaml sidekick.yaml
 COPY sidekick.example.yaml sidekick.example.yaml
 
 EXPOSE 3000
