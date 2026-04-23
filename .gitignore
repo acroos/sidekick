@@ -19,8 +19,5 @@ dist/
 .DS_Store
 Thumbs.db
 
-# Config with secrets (use sidekick.example.yaml as template)
-sidekick.yaml
-
 # Claude Worktrees
 .claude/worktrees
