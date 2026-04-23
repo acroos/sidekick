@@ -2,10 +2,26 @@
 
 ## Prerequisites
 
-- Node.js 20+
-- A Postgres database (local or managed — see [Database](database.md))
+- Node.js 20+ **or** Docker
+- A Postgres database (local, managed, or via Docker Compose — see [Database](database.md))
 
 ## Setup
+
+### Option A: Docker Compose
+
+The simplest way to get running — no Node.js or Postgres installation required:
+
+```bash
+cp sidekick.example.yaml sidekick.yaml
+cp .env.example .env
+# Edit both files with your credentials
+
+docker compose up
+```
+
+Docker Compose starts Postgres and Sidekick together. Migrations run automatically on startup.
+
+### Option B: Local Node.js
 
 ```bash
 npm install
@@ -13,11 +29,10 @@ cp sidekick.example.yaml sidekick.yaml
 cp .env.example .env
 # Edit both files with your credentials
 
-npm run db:migrate
 npm run dev
 ```
 
-The dev server runs on `http://localhost:3000` with hot reload via `tsx watch`.
+The dev server runs on `http://localhost:3000` with hot reload via `tsx watch`. Migrations run automatically on startup.
 
 ## Commands
 
@@ -49,14 +64,16 @@ npm test
 ├── api/index.ts               Vercel serverless entry point
 ├── src/
 │   ├── app.ts                 Hono app factory (dependency injection)
-│   ├── index.ts               Node.js entry point (local dev)
+│   ├── index.ts               Node.js entry point (auto-migrates on startup)
 │   ├── config/                YAML config loader + Zod validation
 │   ├── connectors/linear/     Linear client, webhook parsing, signature verification
 │   ├── github/                Octokit client, workflow dispatch, webhook parsing
-│   ├── db/                    Drizzle schema + database client
+│   ├── db/                    Drizzle schema, database client, migration runner
 │   ├── routes/                HTTP route handlers
 │   ├── services/              Business logic (runs, automations, notifications)
 │   └── middleware/            Request logging, error handling
+├── Dockerfile                 Multi-stage Docker build
+├── docker-compose.yml         Sidekick + Postgres for local/self-hosted use
 ├── sidekick.example.yaml      Example config (copy to sidekick.yaml)
 ├── .env.example               Example env vars (copy to .env)
 ├── drizzle.config.ts          Drizzle Kit config

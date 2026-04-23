@@ -38,28 +38,38 @@ Label a Linear issue → Claude Code runs in GitHub Actions → results posted b
 
 ### Prerequisites
 
-- Node.js 20+
-- A Postgres database ([Neon](https://neon.tech), [Supabase](https://supabase.com), or Vercel Postgres)
 - A GitHub token with `actions:write` scope on your target repo
 - A target repo with a [claude-code-action](https://github.com/anthropics/claude-code-action) workflow
 
-### Local Development
+### Option A: Docker (recommended)
 
 ```bash
-# Install dependencies
-npm install
-
 # Copy the example config and environment
 cp sidekick.example.yaml sidekick.yaml
 cp .env.example .env
 # Edit both files with your credentials
 
-# Run database migrations
-npm run db:migrate
+# Start Sidekick + Postgres
+docker compose up
+```
 
-# Start the dev server
+Docker Compose starts Postgres automatically. Migrations run on startup — no manual steps needed.
+
+### Option B: Local Development
+
+Requires Node.js 20+ and a Postgres database ([Neon](https://neon.tech), [Supabase](https://supabase.com), or local).
+
+```bash
+npm install
+
+cp sidekick.example.yaml sidekick.yaml
+cp .env.example .env
+# Edit both files with your credentials
+
 npm run dev
 ```
+
+Migrations run automatically on startup.
 
 ### Configuration
 
@@ -95,9 +105,11 @@ automations:
 
 Secrets live in environment variables — Vercel's dashboard for production, `.env` for local dev.
 
-### Deploy to Vercel
+### Deploy
 
-The project is configured for Vercel out of the box. Connect the repo, set your environment variables, and deploy.
+**Docker:** Run the image anywhere containers run — your own server, Fly.io, Railway, etc. Set environment variables and mount your `sidekick.yaml`.
+
+**Vercel:** The project is also configured for Vercel out of the box. Connect the repo, set your environment variables, and deploy.
 
 ## Tech Stack
 
@@ -105,7 +117,7 @@ The project is configured for Vercel out of the box. Connect the repo, set your 
 |---|---|
 | Language | TypeScript |
 | Web framework | [Hono](https://hono.dev) |
-| Deployment | [Vercel](https://vercel.com) (serverless) |
+| Deployment | Docker or [Vercel](https://vercel.com) (serverless) |
 | Database | Postgres + [Drizzle ORM](https://orm.drizzle.team) |
 | Configuration | YAML with `${VAR}` env interpolation |
 | Linting | [Biome](https://biomejs.dev) |
