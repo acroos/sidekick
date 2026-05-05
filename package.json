@@ -23,7 +23,7 @@
     "js-yaml": "^4.1.0",
     "octokit": "^5.0.5",
     "postgres": "^3.4.7",
-    "zod": "^4.3.6"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
